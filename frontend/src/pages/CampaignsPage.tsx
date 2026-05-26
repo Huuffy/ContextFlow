@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Send, CheckCircle, Clock, AlertCircle, Megaphone, Trash2, ChevronRight, Loader2, Mail, Phone, MessageSquare, Monitor } from 'lucide-react'
+import { Plus, Send, CheckCircle, Clock, AlertCircle, Megaphone, Trash2, ChevronRight, Loader2, Mail, Phone, MessageSquare, Monitor, Search, ShieldOff, Users } from 'lucide-react'
 import { campaignsApi } from '../services/api'
 import type { Campaign } from '../types'
 
@@ -138,12 +138,12 @@ export default function CampaignsPage() {
     } finally { setBusy(false) }
   }
 
-  const handleApprove = async (id: string) => {
+  const handleApprove = async (id: string, lockedEmails: string[]) => {
     setBusy(true)
     try {
-      await campaignsApi.approve(id)
+      await campaignsApi.approve(id, lockedEmails)
       updateOne({ id, status: 'approved' })
-      flash('Campaign approved')
+      flash(`Campaign approved — ${lockedEmails.length} recipient${lockedEmails.length !== 1 ? 's' : ''} locked`)
     } finally { setBusy(false) }
   }
 
@@ -324,11 +324,154 @@ function CampaignCard({ campaign: c, active, onClick }: {
 
 // ─── Campaign Detail Panel ───────────────────────────────────────────────────
 
+type Recipient = { email: string; name: string; channels: string[]; is_dnc: boolean }
+
+function RecipientPicker({ campaignId, busy, onApprove }: {
+  campaignId: string
+  busy: boolean
+  onApprove: (lockedEmails: string[]) => void
+}) {
+  const [recipients, setRecipients] = useState<Recipient[]>([])
+  const [loading, setLoading]       = useState(true)
+  const [search, setSearch]         = useState('')
+  const [selected, setSelected]     = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    setLoading(true)
+    campaignsApi.recipients(campaignId).then((data) => {
+      setRecipients(data)
+      // Pre-select all non-DNC contacts
+      setSelected(new Set(data.filter((r) => !r.is_dnc).map((r) => r.email)))
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [campaignId])
+
+  const filtered = recipients.filter((r) => {
+    const q = search.toLowerCase()
+    return !q || r.email.includes(q) || r.name.toLowerCase().includes(q)
+  })
+
+  const nonDncFiltered = filtered.filter((r) => !r.is_dnc)
+  const allSelected = nonDncFiltered.length > 0 && nonDncFiltered.every((r) => selected.has(r.email))
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected((s) => { const n = new Set(s); nonDncFiltered.forEach((r) => n.delete(r.email)); return n })
+    } else {
+      setSelected((s) => { const n = new Set(s); nonDncFiltered.forEach((r) => n.add(r.email)); return n })
+    }
+  }
+
+  const toggle = (email: string) => {
+    setSelected((s) => { const n = new Set(s); n.has(email) ? n.delete(email) : n.add(email); return n })
+  }
+
+  const selectedCount = recipients.filter((r) => selected.has(r.email)).length
+  const dncCount      = recipients.filter((r) => r.is_dnc).length
+
+  if (loading) return (
+    <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
+      <Loader2 className="w-4 h-4 animate-spin" /> Loading contacts…
+    </div>
+  )
+
+  if (recipients.length === 0) return (
+    <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
+      <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+      No contacts in the whitelist yet.
+      <br />Share the landing page registration link to collect recipients.
+    </div>
+  )
+
+  return (
+    <div className="mt-1">
+      {/* Search + select-all row */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by email or name…"
+            className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-400"
+          />
+        </div>
+        <button
+          onClick={toggleAll}
+          className="text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 whitespace-nowrap"
+        >
+          {allSelected ? 'Deselect all' : 'Select all'}
+        </button>
+      </div>
+
+      {/* Count bar */}
+      <div className="flex items-center gap-3 text-[11px] text-gray-400 mb-2">
+        <span className="text-primary-600 font-medium">{selectedCount} selected</span>
+        <span>·</span>
+        <span>{recipients.length} total</span>
+        {dncCount > 0 && <><span>·</span><span className="text-red-500">{dncCount} excluded (DNC)</span></>}
+      </div>
+
+      {/* List */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100 max-h-64 overflow-y-auto">
+        {filtered.map((r) => (
+          <label
+            key={r.email}
+            className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
+              r.is_dnc ? 'bg-red-50/50 cursor-not-allowed' : 'hover:bg-gray-50'
+            }`}
+          >
+            <input
+              type="checkbox"
+              disabled={r.is_dnc}
+              checked={selected.has(r.email)}
+              onChange={() => !r.is_dnc && toggle(r.email)}
+              className="rounded text-primary-600 focus:ring-primary-500 disabled:opacity-40"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={`text-xs font-mono font-medium truncate ${r.is_dnc ? 'text-gray-400' : 'text-gray-800'}`}>
+                  {r.email}
+                </span>
+                {r.name && <span className="text-[10px] text-gray-400">({r.name})</span>}
+                {r.is_dnc && (
+                  <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 bg-red-100 text-red-600 rounded font-medium">
+                    <ShieldOff className="w-2.5 h-2.5" /> DNC
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-1 mt-0.5">
+                {r.channels.map((ch) => (
+                  <span key={ch} className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${CHANNEL_COLORS[ch] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {ch}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </label>
+        ))}
+        {filtered.length === 0 && (
+          <div className="text-center py-6 text-xs text-gray-400">No matches</div>
+        )}
+      </div>
+
+      <button
+        onClick={() => onApprove([...selected])}
+        disabled={busy || selectedCount === 0}
+        className="mt-4 flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-colors"
+      >
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+        Approve & lock {selectedCount} recipient{selectedCount !== 1 ? 's' : ''}
+      </button>
+    </div>
+  )
+}
+
 function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, onCancel }: {
   campaign: Campaign
   busy: boolean
   onSubmit: (id: string) => void
-  onApprove: (id: string) => void
+  onApprove: (id: string, lockedEmails: string[]) => void
   onDispatch: (id: string) => void
   onCancel: (id: string) => void
 }) {
@@ -391,6 +534,17 @@ function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, on
         </Section>
       )}
 
+      {/* Recipient picker — only shown during approval */}
+      {c.status === 'pending_approval' && (
+        <Section title="Recipients — Select who receives this campaign">
+          <RecipientPicker
+            campaignId={c.id}
+            busy={busy}
+            onApprove={(lockedEmails) => onApprove(c.id, lockedEmails)}
+          />
+        </Section>
+      )}
+
       {/* Action buttons */}
       <div className="flex flex-wrap items-center gap-3 mt-8">
         {c.status === 'draft' && (
@@ -400,16 +554,6 @@ function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, on
             color="bg-amber-500 hover:bg-amber-600 text-white"
             disabled={busy}
             onClick={() => onSubmit(c.id)}
-          />
-        )}
-
-        {c.status === 'pending_approval' && (
-          <ActionButton
-            label="Approve Campaign"
-            icon={<CheckCircle className="w-4 h-4" />}
-            color="bg-blue-600 hover:bg-blue-700 text-white"
-            disabled={busy}
-            onClick={() => onApprove(c.id)}
           />
         )}
 

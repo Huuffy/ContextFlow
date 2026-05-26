@@ -429,18 +429,18 @@ async def seed():
         campaigns_data = [
             {
                 "name": "Festive Season Travel Offer",
-                "status": CampaignStatus.completed,
+                "status": CampaignStatus.approved,
                 "channels": ["whatsapp", "email"],
                 "template": "Hi {{name}}! Celebrate the festive season with NeoBank Travel Card — earn 5X rewards on all travel bookings till Dec 31. Apply now and get ₹1,000 joining bonus! T&C apply.",
-                "sent": 3847, "delivered": 3654,
+                "sent": 0, "delivered": 0,
                 "scheduled_at": ago(days=14),
             },
             {
                 "name": "EMI Holiday — 0% Interest Offer",
-                "status": CampaignStatus.running,
+                "status": CampaignStatus.approved,
                 "channels": ["whatsapp"],
                 "template": "Dear {{name}}, convert your outstanding balance to easy EMIs at 0% interest this month only! Valid on purchases above ₹5,000. Reply YES to activate or visit our app.",
-                "sent": 1243, "delivered": 1198,
+                "sent": 0, "delivered": 0,
                 "scheduled_at": ago(days=2),
             },
             {

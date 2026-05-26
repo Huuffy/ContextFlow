@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { MessageSquare, Megaphone, Shield, BarChart3, Home, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useWebSocket } from '../hooks/useWebSocket'
 
@@ -12,6 +12,7 @@ const navItems = [
 
 export default function DashboardLayout() {
   useWebSocket('demo-agent')
+  const navigate = useNavigate()
   const [open, setOpen] = useState(true)
 
   return (
@@ -19,23 +20,36 @@ export default function DashboardLayout() {
 
       {/* Sidebar */}
       <aside
-        className={`flex-shrink-0 bg-[#0f3833] flex flex-col transition-all duration-200 ${open ? 'w-56' : 'w-14'}`}
+        className={`relative flex-shrink-0 bg-[#0f3833] flex flex-col transition-all duration-200 ${open ? 'w-56' : 'w-14'}`}
       >
-        {/* Logo + toggle */}
+        {/* Logo + collapse toggle */}
         <div className="h-14 flex items-center justify-between px-3 border-b border-white/10 flex-shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 bg-teal-400 rounded-lg flex items-center justify-center shadow flex-shrink-0">
+          {/* Logo — click goes home */}
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 min-w-0 group"
+            title="Go to home"
+          >
+            <div className="w-7 h-7 bg-teal-400 group-hover:bg-teal-300 rounded-lg flex items-center justify-center shadow flex-shrink-0 transition-colors">
               <MessageSquare className="w-4 h-4 text-white" />
             </div>
-            {open && <span className="text-white font-semibold text-sm truncate">ContextFlow</span>}
-          </div>
-          <button
-            onClick={() => setOpen(!open)}
-            className="text-white/50 hover:text-white transition-colors flex-shrink-0 ml-1"
-            title={open ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            {open ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            {open && (
+              <span className="text-white group-hover:text-teal-200 font-semibold text-sm truncate transition-colors">
+                ContextFlow
+              </span>
+            )}
           </button>
+
+          {/* Collapse button — only visible when sidebar is open */}
+          {open && (
+            <button
+              onClick={() => setOpen(false)}
+              className="text-white/50 hover:text-white transition-colors flex-shrink-0 ml-1"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Nav links */}
@@ -81,9 +95,20 @@ export default function DashboardLayout() {
             </div>
           )}
         </div>
+
+        {/* Expand tab — floats on the right edge when sidebar is collapsed */}
+        {!open && (
+          <button
+            onClick={() => setOpen(true)}
+            title="Expand sidebar"
+            className="absolute top-3.5 -right-3 z-10 w-6 h-6 rounded-full bg-[#0f3833] border border-white/20 shadow flex items-center justify-center text-white/70 hover:text-white hover:bg-teal-700 transition-colors"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        )}
       </aside>
 
-      {/* Main content — min-h-0 is critical for flex children to respect overflow */}
+      {/* Main content */}
       <main className="flex-1 min-h-0 min-w-0 overflow-hidden">
         <Outlet />
       </main>

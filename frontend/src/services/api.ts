@@ -71,7 +71,12 @@ export const campaignsApi = {
   create: (data: { name: string; content_template: string; target_channels: string[]; audience_filter?: Record<string, unknown> }) =>
     client.post<Campaign>('/campaigns', data).then((r) => r.data),
   submitReview: (id: string) => client.post(`/campaigns/${id}/submit-review`).then((r) => r.data),
-  approve: (id: string) => client.post(`/campaigns/${id}/approve`).then((r) => r.data),
+  approve: (id: string, lockedEmails: string[]) =>
+    client.post(`/campaigns/${id}/approve`, { locked_emails: lockedEmails }).then((r) => r.data),
+  recipients: (id: string) =>
+    client.get<{ email: string; name: string; channels: string[]; is_dnc: boolean }[]>(
+      `/campaigns/${id}/recipients`
+    ).then((r) => r.data),
   dispatch: (id: string) => client.post(`/campaigns/${id}/dispatch`).then((r) => r.data),
   cancel: (id: string) => client.delete(`/campaigns/${id}`).then((r) => r.data),
 }
@@ -92,6 +97,13 @@ export const analytics = {
 export const test = {
   sendEmail: () => client.post('/test/send-email').then((r) => r.data),
 }
+
+export const register = (data: {
+  email: string
+  name?: string
+  whatsapp?: string
+  telegram?: string
+}) => client.post('/register', data).then((r) => r.data)
 
 export const simulator = {
   send: (channel: string, identifier: string, content: string) =>

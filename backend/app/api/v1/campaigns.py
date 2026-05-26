@@ -1,17 +1,29 @@
 import json
 import asyncio
 import logging
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_db
-from app.models import Campaign, CampaignStatus, Customer, ChannelIdentifier
+from app.models import Campaign, CampaignStatus
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
+
+WHITELIST_PATH = Path(__file__).resolve().parent.parent.parent.parent.parent / "whitelist.json"
+
+
+def _read_whitelist() -> list[dict]:
+    try:
+        if WHITELIST_PATH.exists():
+            return json.loads(WHITELIST_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return []
 
 
 class CampaignCreate(BaseModel):
@@ -65,13 +77,55 @@ async def submit_review(campaign_id: str, db: AsyncSession = Depends(get_db)):
     return {"status": "submitted"}
 
 
+class ApproveRequest(BaseModel):
+    locked_emails: Optional[list[str]] = None
+
+
+@router.get("/{campaign_id}/recipients")
+async def get_recipients(campaign_id: str, db: AsyncSession = Depends(get_db)):
+    """Return whitelist contacts annotated with DNC status."""
+    from app.models import DNCEntry, IdentifierType
+    contacts = _read_whitelist()
+
+    dnc_result = await db.execute(
+        select(DNCEntry.identifier).where(
+            DNCEntry.identifier_type == IdentifierType.email,
+            DNCEntry.is_active == True,
+        )
+    )
+    dnc_emails = {row[0].lower() for row in dnc_result.all()}
+
+    out = []
+    for c in contacts:
+        email = (c.get("email") or "").lower()
+        if not email:
+            continue
+        channels = []
+        if c.get("email"):    channels.append("email")
+        if c.get("whatsapp"): channels.append("whatsapp")
+        if c.get("telegram"): channels.append("telegram")
+        out.append({
+            "email":    email,
+            "name":     c.get("name", ""),
+            "channels": channels,
+            "is_dnc":   email in dnc_emails,
+        })
+    return out
+
+
 @router.post("/{campaign_id}/approve")
-async def approve_campaign(campaign_id: str, db: AsyncSession = Depends(get_db)):
+async def approve_campaign(campaign_id: str, body: ApproveRequest = ApproveRequest(),
+                            db: AsyncSession = Depends(get_db)):
     c = await _get_campaign(campaign_id, db)
     if c.status != CampaignStatus.pending_approval:
         raise HTTPException(status_code=400, detail="Only pending campaigns can be approved")
     c.status = CampaignStatus.approved
     c.approved_by = None
+    # Lock approved recipient list into audience_filter
+    if body.locked_emails is not None:
+        af = json.loads(c.audience_filter_json)
+        af["locked_emails"] = [e.lower().strip() for e in body.locked_emails]
+        c.audience_filter_json = json.dumps(af)
     await db.commit()
     return {"status": "approved"}
 
@@ -99,11 +153,16 @@ async def delete_campaign(campaign_id: str, db: AsyncSession = Depends(get_db)):
 
 
 async def _run_dispatch(campaign_id: str) -> None:
-    """Background task: send campaign message to all eligible customers."""
+    """Background task: send campaign message to all contacts in whitelist.json."""
     from app.db.session import AsyncSessionLocal
-    from app.api.v1.compliance import is_customer_blocked
+    from app.models import DNCEntry, IdentifierType
+    from sqlalchemy import select as _select
 
     try:
+        contacts = _read_whitelist()
+        if not contacts:
+            logger.warning(f"Campaign {campaign_id}: whitelist is empty — no messages sent")
+
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
             campaign = result.scalar_one_or_none()
@@ -111,46 +170,60 @@ async def _run_dispatch(campaign_id: str) -> None:
                 return
 
             target_channels: list[str] = json.loads(campaign.target_channels_json)
+            audience_filter: dict = json.loads(campaign.audience_filter_json)
+            locked_emails: set[str] | None = (
+                {e.lower() for e in audience_filter["locked_emails"]}
+                if "locked_emails" in audience_filter else None
+            )
 
-            # Get all customers
-            customers_result = await db.execute(select(Customer))
-            customers = customers_result.scalars().all()
+            # Pre-load active DNC emails for fast lookup
+            dnc_result = await db.execute(
+                _select(DNCEntry.identifier).where(
+                    DNCEntry.identifier_type == IdentifierType.email,
+                    DNCEntry.is_active == True,
+                )
+            )
+            dnc_emails = {row[0].lower() for row in dnc_result.all()}
 
             sent = 0
             delivered = 0
 
-            for customer in customers:
+            for contact in contacts:
+                email = (contact.get("email") or "").lower()
+                if not email:
+                    continue
+                # Respect locked recipient list from approval step
+                if locked_emails is not None and email not in locked_emails:
+                    continue
                 # DNC check
-                if await is_customer_blocked(customer.id, db):
+                if email in dnc_emails:
+                    logger.info(f"Campaign {campaign_id}: skipping {email} (DNC)")
                     continue
 
-                # Find channel identifier for each target channel
+                name = (contact.get("name") or email.split("@")[0]).split()[0]
+                text = campaign.content_template.replace("{{name}}", name)
+
                 for channel in target_channels:
-                    ci_result = await db.execute(
-                        select(ChannelIdentifier).where(
-                            ChannelIdentifier.customer_id == customer.id,
-                            ChannelIdentifier.channel == channel,
-                        )
-                    )
-                    ci = ci_result.scalar_one_or_none()
-                    if not ci:
+                    identifier: str | None = None
+                    if channel == "email":
+                        identifier = email
+                    elif channel == "whatsapp":
+                        identifier = contact.get("whatsapp")
+                    elif channel == "telegram":
+                        identifier = contact.get("telegram")
+                    elif channel == "instagram":
+                        identifier = contact.get("instagram")
+
+                    if not identifier:
                         continue
 
-                    # Personalize message
-                    name = customer.display_name.split()[0] if customer.display_name else "Customer"
-                    text = campaign.content_template.replace("{{name}}", name)
-
-                    # Deliver
-                    ok = await _send_campaign_message(channel, ci.identifier, text,
-                                                      campaign.name, customer.email)
+                    ok = await _send_campaign_message(channel, identifier, text, campaign.name, email)
                     sent += 1
                     if ok:
                         delivered += 1
 
-                    # Small delay to avoid rate-limit bursts
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(0.05)  # avoid rate-limit bursts
 
-            # Mark completed
             campaign.sent_count = sent
             campaign.delivered_count = delivered
             campaign.status = CampaignStatus.completed
@@ -159,9 +232,9 @@ async def _run_dispatch(campaign_id: str) -> None:
 
     except Exception as e:
         logger.error(f"Campaign dispatch error for {campaign_id}: {e}", exc_info=True)
-        # Try to mark as completed anyway so it doesn't stay "running"
         try:
-            async with AsyncSessionLocal() as db:
+            from app.db.session import AsyncSessionLocal as _ASL
+            async with _ASL() as db:
                 result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
                 c = result.scalar_one_or_none()
                 if c and c.status == CampaignStatus.running:

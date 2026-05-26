@@ -32,25 +32,29 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 _worker_tasks: list = []
 
 
+def _preload_embedding_model() -> None:
+    """Runs in a thread pool — loads the HF model without blocking the event loop."""
+    from app.ai.embedder import get_model
+    get_model()
+    logger.info("Embedding model ready")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
 
-    # Ensure data directories exist
     settings.ensure_dirs()
+    loop = asyncio.get_event_loop()
 
-    # Init SQLite DB (creates tables if missing)
-    await init_db()
-    logger.info("SQLite DB initialized")
+    # DB init (async) + LanceDB init (sync) run concurrently
+    await asyncio.gather(
+        init_db(),
+        loop.run_in_executor(None, init_lancedb),
+    )
+    logger.info("DB initialized")
 
-    # Init LanceDB (creates tables if missing)
-    init_lancedb()
-    logger.info("LanceDB initialized")
-
-    # Pre-load embedding model so first message has no cold-start delay
-    from app.ai.embedder import get_model
-    get_model()
-    logger.info("Embedding model loaded")
+    # Fire off embedding model load in background — server is ready before it finishes
+    loop.run_in_executor(None, _preload_embedding_model)
 
     # Start in-process workers
     from app.events.queues import inbound_queue, outbound_queue
@@ -73,9 +77,9 @@ async def lifespan(app: FastAPI):
         _worker_tasks.append(asyncio.create_task(run_telegram_poller(inbound_queue)))
         logger.info("Telegram poller started")
 
+    logger.info("Startup complete")
     yield
 
-    # Cleanup
     for task in _worker_tasks:
         task.cancel()
     logger.info("Workers stopped")

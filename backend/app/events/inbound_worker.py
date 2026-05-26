@@ -296,11 +296,11 @@ async def _link_to_email(channel: str, identifier: str, current_customer_id: str
 async def _embed_message(message_id: str, content: str, conversation_id: str,
                           customer_id: str, channel: str) -> None:
     try:
-        from app.ai.embedder import embed
+        from app.ai.embedder import embed_async
         from app.db.lancedb_client import get_message_embeddings_table
         from datetime import datetime, timezone
 
-        vector = embed(content)
+        vector = await embed_async(content)
         table = get_message_embeddings_table()
         table.add([{
             "message_id": message_id,

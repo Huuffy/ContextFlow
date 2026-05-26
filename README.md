@@ -27,7 +27,7 @@
 
 **ContextFlow** is a production-ready omni-channel customer communication platform built for India's Public Sector Banks, Regional Rural Banks, and Co-operative Banks. It integrates WhatsApp and Instagram via the **Meta Cloud API**, Email via **Gmail IMAP/SMTP**, and Telegram via the **Bot API** — all unified into a single conversation thread per customer.
 
-When a customer opens a query on Instagram and follows up on WhatsApp, the agent sees one continuous thread with no gaps. Every inbound message is automatically summarised and sentiment-scored by **GPT-4o**. Campaigns are audience-targeted by transaction history. Every outbound message passes a live DNC compliance check before dispatch. Customers can self-opt-out on any channel by replying `opt out`.
+When a customer opens a query on Instagram and follows up on WhatsApp, the agent sees one continuous thread with no gaps. Every inbound message is automatically summarised and sentiment-scored by **GPT-4o**. Campaigns are audience-targeted by transaction history. Every outbound message passes a live DNC compliance check before dispatch. Customers can self-opt-out on any channel by replying `opt out`. Inbox = reactive (customer contacts bank, agent responds) Campaigns = proactive (bank contacts many customers at once)
 
 ---
 

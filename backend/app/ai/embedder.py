@@ -1,3 +1,4 @@
+import asyncio
 from sentence_transformers import SentenceTransformer
 import logging
 
@@ -22,3 +23,9 @@ def embed(text: str) -> list[float]:
 
 def embed_batch(texts: list[str]) -> list[list[float]]:
     return get_model().encode(texts, normalize_embeddings=True, show_progress_bar=False).tolist()
+
+
+async def embed_async(text: str) -> list[float]:
+    """Non-blocking embed — runs CPU work in the default thread executor."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, embed, text)

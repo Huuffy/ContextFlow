@@ -75,7 +75,8 @@ export interface Campaign {
   id: string
   name: string
   status: string
-  target_channels_json: string
+  target_channels: string[]
+  audience_filter: Record<string, unknown>
   content_template: string
   scheduled_at?: string
   sent_count: number

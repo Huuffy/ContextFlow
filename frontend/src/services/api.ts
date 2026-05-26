@@ -68,13 +68,12 @@ export const documents = {
 
 export const campaignsApi = {
   list: () => client.get<Campaign[]>('/campaigns').then((r) => r.data),
-  create: (data: Partial<Campaign>) =>
+  create: (data: { name: string; content_template: string; target_channels: string[]; audience_filter?: Record<string, unknown> }) =>
     client.post<Campaign>('/campaigns', data).then((r) => r.data),
-  update: (id: string, data: Partial<Campaign>) =>
-    client.put<Campaign>(`/campaigns/${id}`, data).then((r) => r.data),
+  submitReview: (id: string) => client.post(`/campaigns/${id}/submit-review`).then((r) => r.data),
   approve: (id: string) => client.post(`/campaigns/${id}/approve`).then((r) => r.data),
-  schedule: (id: string, at: string) =>
-    client.post(`/campaigns/${id}/schedule`, { scheduled_at: at }).then((r) => r.data),
+  dispatch: (id: string) => client.post(`/campaigns/${id}/dispatch`).then((r) => r.data),
+  cancel: (id: string) => client.delete(`/campaigns/${id}`).then((r) => r.data),
 }
 
 export const compliance = {

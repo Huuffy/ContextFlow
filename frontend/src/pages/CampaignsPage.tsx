@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Send, CheckCircle, Clock, AlertCircle, Megaphone, Trash2, ChevronRight, Loader2, Mail, Phone, MessageSquare, Monitor, Search, ShieldOff, Users } from 'lucide-react'
+import { Plus, Send, CheckCircle, Clock, AlertCircle, Megaphone, Trash2, ChevronRight, Loader2, Mail, Phone, MessageSquare, Monitor, Search, ShieldOff, Users, UserPlus } from 'lucide-react'
 import { campaignsApi } from '../services/api'
 import type { Campaign } from '../types'
+import { RegisterModalWrapper } from '../components/RegisterModal'
 
 // ─── Status config ─────────────────────────────────────────────────────────
 
@@ -56,6 +57,7 @@ export default function CampaignsPage() {
   const [form, setForm]               = useState(BLANK)
   const [busy, setBusy]               = useState(false)
   const [actionMsg, setActionMsg]     = useState<string | null>(null)
+  const [showRegister, setShowRegister] = useState(false)
   const [panelWidth, setPanelWidth]   = useState(300)
   const dragging = useRef(false)
   const startX   = useRef(0)
@@ -167,12 +169,11 @@ export default function CampaignsPage() {
   }
 
   const handleCancel = async (id: string) => {
-    if (!confirm('Cancel this campaign?')) return
     setBusy(true)
     try {
       await campaignsApi.cancel(id)
-      updateOne({ id, status: 'cancelled' })
-      flash('Campaign cancelled')
+      setCampaigns((prev) => prev.filter((c) => c.id !== id))
+      if (selected?.id === id) setSelected(null)
     } finally { setBusy(false) }
   }
 
@@ -180,6 +181,7 @@ export default function CampaignsPage() {
 
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
+      <RegisterModalWrapper show={showRegister} onClose={() => setShowRegister(false)} />
 
       {/* Top bar */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
@@ -190,12 +192,20 @@ export default function CampaignsPage() {
             <p className="text-xs text-gray-400">{campaigns.length} total · {campaigns.filter(c => c.status === 'running').length} live</p>
           </div>
         </div>
-        <button
-          onClick={() => { setCreating(true); setSelected(null) }}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" /> New Campaign
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowRegister(true)}
+            className="flex items-center gap-1.5 px-4 py-2 border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-sm font-medium transition-colors"
+          >
+            <UserPlus className="w-4 h-4" /> Register to receive email
+          </button>
+          <button
+            onClick={() => { setCreating(true); setSelected(null) }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" /> New Campaign
+          </button>
+        </div>
       </div>
 
       {/* Flash message */}
@@ -239,6 +249,7 @@ export default function CampaignsPage() {
                 campaign={c}
                 active={selected?.id === c.id && !creating}
                 onClick={() => { setSelected(c); setCreating(false) }}
+                onDelete={() => handleCancel(c.id)}
               />
             ))}
             {filtered.length === 0 && (
@@ -290,35 +301,48 @@ export default function CampaignsPage() {
 
 // ─── Campaign Card (left list item) ─────────────────────────────────────────
 
-function CampaignCard({ campaign: c, active, onClick }: {
-  campaign: Campaign; active: boolean; onClick: () => void
+function CampaignCard({ campaign: c, active, onClick, onDelete }: {
+  campaign: Campaign; active: boolean; onClick: () => void; onDelete: () => void
 }) {
   const st = STATUS[c.status as keyof typeof STATUS] ?? STATUS.draft
+  const canDelete = c.status !== 'running'
 
   return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left rounded-xl px-3 py-3 transition-colors border ${
+    <div
+      className={`relative group rounded-xl transition-colors border ${
         active
           ? 'bg-primary-50 border-primary-200'
           : 'bg-white border-transparent hover:bg-gray-50 hover:border-gray-200'
       }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
-          <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{c.content_template}</p>
+      <button onClick={onClick} className="w-full text-left px-3 py-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">{c.name}</p>
+            <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{c.content_template}</p>
+          </div>
+          <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 mt-0.5" />
         </div>
-        <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 mt-0.5" />
-      </div>
-      <div className="flex items-center gap-2 mt-2">
-        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${st.color}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-          {st.label}
-        </span>
-        {c.status === 'running' && <Loader2 className="w-3 h-3 text-teal-500 animate-spin" />}
-      </div>
-    </button>
+        <div className="flex items-center gap-2 mt-2">
+          <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium border ${st.color}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+            {st.label}
+          </span>
+          {c.status === 'running' && <Loader2 className="w-3 h-3 text-teal-500 animate-spin" />}
+        </div>
+      </button>
+
+      {/* Delete button — appears on hover */}
+      {canDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+          title="Delete campaign"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -581,16 +605,6 @@ function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, on
           </div>
         )}
 
-        {canCancel && (
-          <button
-            onClick={() => onCancel(c.id)}
-            disabled={busy}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors disabled:opacity-50"
-          >
-            <Trash2 className="w-4 h-4" />
-            Cancel
-          </button>
-        )}
       </div>
 
       {/* Lifecycle guide */}

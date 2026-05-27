@@ -8,6 +8,7 @@ import enum
 class ConversationStatus(str, enum.Enum):
     open = "open"
     waiting = "waiting"
+    awaiting_acc_no = "awaiting_acc_no"
     resolved = "resolved"
     closed = "closed"
 
@@ -23,6 +24,7 @@ class Conversation(Base, TimestampMixin):
     priority: Mapped[int] = mapped_column(Integer, default=0)
     topic: Mapped[str | None] = mapped_column(String, nullable=True)
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    linked_account_number: Mapped[str | None] = mapped_column(String, nullable=True)
 
     customer = relationship("Customer", back_populates="conversations")
     assigned_agent = relationship("Agent", back_populates="conversations", foreign_keys=[assigned_agent_id])

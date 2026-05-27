@@ -98,6 +98,7 @@ app.add_middleware(
 # API routers
 from app.api.v1.auth import router as auth_router
 from app.api.v1.conversations import router as conversations_router
+from app.api.v1.accounts import router as accounts_router
 from app.api.v1.customers import router as customers_router
 from app.api.v1.messages import router as messages_router
 from app.api.v1.documents import router as documents_router
@@ -113,6 +114,7 @@ from app.api.webhooks.telegram import router as telegram_router
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(conversations_router, prefix="/api/v1")
+app.include_router(accounts_router, prefix="/api/v1")
 app.include_router(customers_router, prefix="/api/v1")
 app.include_router(messages_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")

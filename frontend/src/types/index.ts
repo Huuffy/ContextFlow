@@ -51,7 +51,7 @@ export interface Conversation {
   id: string
   customer_id: string
   assigned_agent_id?: string
-  status: 'open' | 'waiting' | 'resolved' | 'closed'
+  status: 'open' | 'waiting' | 'awaiting_acc_no' | 'resolved' | 'closed'
   active_channels: Channel[]
   priority: number
   topic?: string
@@ -60,6 +60,7 @@ export interface Conversation {
   customer_name?: string
   one_liner?: string
   sentiment?: string
+  linked_account_number?: string
 }
 
 export interface Transaction {
@@ -82,6 +83,23 @@ export interface Campaign {
   sent_count: number
   delivered_count: number
   created_at: string
+}
+
+export interface BankAccount {
+  account_number: string
+  nickname?: string
+  account_type: string
+  balance: number
+}
+
+export interface AccountTransaction {
+  id: string
+  account_number: string
+  amount: number
+  merchant_name: string
+  merchant_category: string
+  transaction_date: string
+  transaction_type: 'credit' | 'debit'
 }
 
 export interface DNCEntry {

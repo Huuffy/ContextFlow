@@ -30,6 +30,34 @@ AUTO_REPLY_TEXT = (
     "— NeoBank Support Team"
 )
 
+PAYMENT_KEYWORDS = frozenset({
+    "payment", "transaction", "transfer", "debit", "credit", "amount",
+    "charge", "balance", "paid", "received", "sent", "refund", "dispute",
+    "₹", " rs ", "rupee", "rupees", "upi", "neft", "rtgs", "imps",
+    "overcharged", "wrong amount", "double charge",
+})
+
+PAYMENT_AUTO_REPLY = (
+    "Thank you for contacting NeoBank Support!\n\n"
+    "We noticed your query relates to a payment or transaction. "
+    "To pull up your account details, please reply with your NeoBank account number.\n\n"
+    "For demo purposes, try one of these accounts:\n"
+    "  • 8888 — Savings Account\n"
+    "  • 9999 — Current Account\n"
+    "  • 7777 — Credit Account\n"
+    "  • 6666 — Salary Account\n\n"
+    "Just reply with the number and we'll fetch your transaction history.\n"
+    "— NeoBank Support Team"
+)
+
+ACC_LINKED_REPLY = (
+    "Account {acc_no} linked successfully! "
+    "Our team can now see your transaction history and will assist you shortly.\n"
+    "— NeoBank Support Team"
+)
+
+_ACC_RE = re.compile(r'\b(\d{4,12})\b')
+
 OPT_OUT_ACK = (
     "You have been successfully opted out. "
     "You will no longer receive marketing communications from NeoBank. "
@@ -64,19 +92,44 @@ async def _process(event: InboundEvent) -> None:
 
             message = await persist_inbound_message(event, customer_id, conversation_id, db)
 
-            # Ticket state machine: customer replied → re-open if waiting
+            # Ticket state machine
             from app.models import Conversation, ConversationStatus
             from sqlalchemy import select as _select
             conv_result = await db.execute(_select(Conversation).where(Conversation.id == conversation_id))
             _conv = conv_result.scalar_one_or_none()
-            if _conv and _conv.status == ConversationStatus.waiting:
-                _conv.status = ConversationStatus.open
+            if _conv:
+                if _conv.status == ConversationStatus.waiting:
+                    _conv.status = ConversationStatus.open
+                elif _conv.status == ConversationStatus.awaiting_acc_no:
+                    # Try to extract account number from reply
+                    acc_no = _extract_account_number(event.content)
+                    if acc_no:
+                        await _ensure_account_exists(acc_no, db)
+                        _conv.linked_account_number = acc_no
+                        _conv.status = ConversationStatus.open
+                        auto_reply_msg = await persist_system_message(
+                            ACC_LINKED_REPLY.format(acc_no=acc_no),
+                            event.channel, conversation_id, db
+                        )
 
-            # Auto-reply for email and telegram: first contact only, does NOT change status
+            # Store email subject as conv topic so agent replies can thread correctly
+            if _conv and event.channel == "email":
+                subject = event.raw.get("subject", "")
+                if subject and not _conv.topic:
+                    _conv.topic = subject
+
+            # Auto-reply for email and telegram: first contact only
             if event.channel in ("email", "telegram") and await is_first_message(conversation_id, db):
-                auto_reply_msg = await persist_system_message(
-                    AUTO_REPLY_TEXT, event.channel, conversation_id, db
-                )
+                if event.channel == "email" and _has_payment_keywords(event.content):
+                    auto_reply_msg = await persist_system_message(
+                        PAYMENT_AUTO_REPLY, event.channel, conversation_id, db
+                    )
+                    if _conv:
+                        _conv.status = ConversationStatus.awaiting_acc_no
+                else:
+                    auto_reply_msg = await persist_system_message(
+                        AUTO_REPLY_TEXT, event.channel, conversation_id, db
+                    )
 
             await db.commit()
 
@@ -98,7 +151,7 @@ async def _process(event: InboundEvent) -> None:
 
         # Deliver auto-reply on the actual channel and broadcast to dashboard
         if auto_reply_msg:
-            asyncio.create_task(_deliver_auto_reply(event.channel, event.identifier, AUTO_REPLY_TEXT, event.raw))
+            asyncio.create_task(_deliver_auto_reply(event.channel, event.identifier, auto_reply_msg.content, event.raw))
             await ws_manager.broadcast({
                 "type": "message_new",
                 "data": {
@@ -106,7 +159,7 @@ async def _process(event: InboundEvent) -> None:
                     "conversation_id": conversation_id,
                     "customer_id": customer_id,
                     "channel": event.channel,
-                    "content": AUTO_REPLY_TEXT,
+                    "content": auto_reply_msg.content,
                     "sender_type": "system",
                     "direction": "outbound",
                 }
@@ -114,6 +167,29 @@ async def _process(event: InboundEvent) -> None:
 
     except Exception as e:
         logger.error(f"Error processing inbound event: {e}", exc_info=True)
+
+
+def _has_payment_keywords(content: str) -> bool:
+    text = content.lower()
+    return any(kw in text for kw in PAYMENT_KEYWORDS)
+
+
+def _extract_account_number(content: str) -> str | None:
+    match = _ACC_RE.search(content)
+    return match.group(1) if match else None
+
+
+async def _ensure_account_exists(account_number: str, db) -> None:
+    from app.models import BankAccount
+    from sqlalchemy import select
+    result = await db.execute(select(BankAccount).where(BankAccount.account_number == account_number))
+    if not result.scalar_one_or_none():
+        db.add(BankAccount(
+            account_number=account_number,
+            nickname="Linked Account",
+            account_type="savings",
+            balance=0,
+        ))
 
 
 async def _handle_opt_out(event: InboundEvent, customer_id: str,

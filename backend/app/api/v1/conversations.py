@@ -24,6 +24,7 @@ class ConversationOut(BaseModel):
     one_liner: Optional[str] = None
     sentiment: Optional[str] = None
     unread_count: int = 0
+    linked_account_number: Optional[str] = None
 
 
 class MessageOut(BaseModel):
@@ -74,6 +75,7 @@ async def list_conversations(
             created_at=conv.created_at,
             one_liner=summary.one_liner if summary else None,
             sentiment=summary.sentiment.value if summary else None,
+            linked_account_number=conv.linked_account_number,
         ))
     return out
 
@@ -103,6 +105,7 @@ async def get_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
         topic=conv.topic, last_message_at=conv.last_message_at, created_at=conv.created_at,
         one_liner=summary.one_liner if summary else None,
         sentiment=summary.sentiment.value if summary else None,
+        linked_account_number=conv.linked_account_number,
     )
 
 

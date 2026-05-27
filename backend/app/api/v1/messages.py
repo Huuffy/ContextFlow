@@ -65,24 +65,26 @@ async def send_message(body: SendMessageRequest, db: AsyncSession = Depends(get_
     # For email: build reply threading metadata
     email_subject: str | None = None
     in_reply_to: str | None = None
+    references: str | None = None
     if body.channel == "email":
-        # Use conversation topic as Re: subject
+        # Use stored email subject so the reply lands in the same Gmail thread
         raw_subject = conv.topic or "NeoBank Support"
         email_subject = raw_subject if raw_subject.lower().startswith("re:") else f"Re: {raw_subject}"
-        # Find the last inbound email's Message-ID for threading
-        last_inbound = await db.execute(
+        # Collect all inbound Message-IDs in chronological order for References header
+        all_inbound = await db.execute(
             select(Message)
             .where(
                 Message.conversation_id == body.conversation_id,
                 Message.channel == "email",
                 Message.direction == MessageDirection.inbound,
             )
-            .order_by(Message.created_at.desc())
-            .limit(1)
+            .order_by(Message.created_at.asc())
         )
-        last_msg = last_inbound.scalar_one_or_none()
-        if last_msg and last_msg.external_id and "@" in last_msg.external_id:
-            in_reply_to = last_msg.external_id  # real Message-ID looks like <xxx@mail.gmail.com>
+        inbound_msgs = all_inbound.scalars().all()
+        msg_ids = [m.external_id for m in inbound_msgs if m.external_id and "@" in m.external_id]
+        if msg_ids:
+            in_reply_to = msg_ids[-1]       # reply to the most recent inbound
+            references = " ".join(msg_ids)  # full chain for References header
 
     # Enqueue for delivery
     await outbound_queue.put(OutboundEvent(
@@ -92,6 +94,7 @@ async def send_message(body: SendMessageRequest, db: AsyncSession = Depends(get_
         message_id=msg.id,
         subject=email_subject,
         in_reply_to=in_reply_to,
+        references=references,
     ))
 
     return {

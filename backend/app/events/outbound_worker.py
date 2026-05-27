@@ -46,6 +46,7 @@ async def _send_via_channel(event: OutboundEvent) -> bool:
                 subject=event.subject or "Re: NeoBank Support",
                 body=event.content,
                 in_reply_to=event.in_reply_to,
+                references=event.references,
             )
         elif channel == "telegram":
             from app.integrations.telegram_client import send_telegram_message

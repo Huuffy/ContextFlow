@@ -85,12 +85,12 @@ export default function DashboardLayout() {
           </NavLink>
           {open && (
             <div className="flex items-center gap-2 px-2 py-2 mt-1">
-              <div className="w-6 h-6 rounded-full bg-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                C
+              <div className="w-6 h-6 rounded-full bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300 text-xs font-bold flex-shrink-0">
+                N
               </div>
               <div className="min-w-0">
-                <p className="text-white text-xs font-medium truncate">CloudCompute</p>
-                <p className="text-white/40 text-[10px] truncate">idea 2.0 Hackathon 2026</p>
+                <p className="text-white text-xs font-medium truncate">NeoBank</p>
+                <p className="text-white/40 text-[10px] truncate">Demo account</p>
               </div>
             </div>
           )}

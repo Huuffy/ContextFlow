@@ -21,10 +21,24 @@ from app.models import (
     Conversation, ConversationStatus, Message, SenderType, MessageDirection, MessageStatus,
     Campaign, CampaignStatus,
     AISummary, SentimentType, Transaction, ConsentRecord, ConsentType, ConsentStatus,
+    BankAccount, AccountTransaction,
 )
 from app.core.security import hash_password
 
 NOW = datetime.now(timezone.utc)
+
+_PAYMENT_AUTO_REPLY_SEED = (
+    "Thank you for contacting NeoBank Support!\n\n"
+    "We noticed your query relates to a payment or transaction. "
+    "To pull up your account details, please reply with your NeoBank account number.\n\n"
+    "For demo purposes, try one of these accounts:\n"
+    "  • 8888 — Savings Account\n"
+    "  • 9999 — Current Account\n"
+    "  • 7777 — Credit Account\n"
+    "  • 6666 — Salary Account\n\n"
+    "Just reply with the number and we'll fetch your transaction history.\n"
+    "— NeoBank Support Team"
+)
 
 
 def ago(**kwargs):
@@ -99,14 +113,14 @@ CONVERSATIONS = [
     {
         "customer": "Deepika Singh",
         "topic": "Net banking login not working",
-        "channels": ["simulator"],
+        "channels": ["instagram"],
         "status": ConversationStatus.open,
         "sentiment": SentimentType.negative,
         "one_liner": "Customer locked out of net banking — cannot reset password as OTP not received.",
         "summary": "Deepika Singh reported that she has been unable to log into her net banking account for the past 2 days. The OTP required for password reset is not being delivered to her registered mobile number +919876543216.",
         "suggested": "Verify mobile number registration, trigger OTP resend from backend, escalate to tech team if issue persists.",
         "messages": [
-            ("I cannot login to net banking since 2 days. OTP is not coming to my number. I tried calling helpline but no response.", SenderType.customer, "simulator", ago(minutes=45)),
+            ("I cannot login to net banking since 2 days. OTP is not coming to my number. I tried calling helpline but no response.", SenderType.customer, "instagram", ago(minutes=45)),
         ],
     },
     # ── OPEN: Active (back-and-forth, customer replied last) ─────────────────
@@ -316,10 +330,22 @@ async def seed():
 
     await init_db()
 
+    # Add new columns that create_all won't add to existing tables
+    async with AsyncSessionLocal() as db:
+        for stmt in [
+            "ALTER TABLE conversations ADD COLUMN linked_account_number TEXT",
+        ]:
+            try:
+                await db.execute(text(stmt))
+                await db.commit()
+            except Exception:
+                await db.rollback()  # column already exists — ignore
+
     # Truncate all tables in FK order (works whether we deleted the file or not)
     async with AsyncSessionLocal() as db:
         for tbl in ("messages", "ai_summaries", "conversations", "channel_identifiers",
-                    "transactions", "consent_records", "dnc_list", "campaigns", "customers", "agents"):
+                    "transactions", "consent_records", "dnc_list", "campaigns", "customers", "agents",
+                    "account_transactions", "bank_accounts"):
             await db.execute(text(f"DELETE FROM {tbl}"))
         await db.commit()
         print("Cleared existing rows.")
@@ -387,6 +413,13 @@ async def seed():
             customer_map[name] = customer
 
         await db.flush()
+
+        # Awaiting-acc-no demo customers contacted via email only — strip whatsapp/telegram
+        for email_only in ("Shreya Banerjee", "Varun Pillai"):
+            cust = customer_map[email_only]
+            await db.execute(text(
+                "DELETE FROM channel_identifiers WHERE customer_id = :cid AND channel IN ('whatsapp', 'telegram')"
+            ), {"cid": cust.id})
 
         print("Seeding conversations...")
         for conv_def in CONVERSATIONS:
@@ -483,19 +516,213 @@ async def seed():
                 delivered_count=cd["delivered"],
             ))
 
+        print("Seeding demo bank accounts...")
+        demo_accounts = [
+            BankAccount(account_number="8888", nickname="Savings Account", account_type="savings", balance=Decimal("45230.00")),
+            BankAccount(account_number="9999", nickname="Current Account", account_type="current", balance=Decimal("123500.00")),
+            BankAccount(account_number="7777", nickname="Credit Account", account_type="credit", balance=Decimal("-8400.00")),
+            BankAccount(account_number="6666", nickname="Salary Account", account_type="salary", balance=Decimal("89750.00")),
+        ]
+        for acc in demo_accounts:
+            db.add(acc)
+        await db.flush()
+
+        demo_transactions = [
+            # Account 8888 — Savings
+            AccountTransaction(account_number="8888", amount=Decimal("300"),   merchant_name="Swiggy",    merchant_category="Food",          transaction_date=date(2026, 5, 25), transaction_type="debit"),
+            AccountTransaction(account_number="8888", amount=Decimal("1200"),  merchant_name="BigBasket", merchant_category="Groceries",     transaction_date=date(2026, 5, 22), transaction_type="debit"),
+            AccountTransaction(account_number="8888", amount=Decimal("850"),   merchant_name="Ola",       merchant_category="Transport",     transaction_date=date(2026, 5, 20), transaction_type="debit"),
+            AccountTransaction(account_number="8888", amount=Decimal("5000"),  merchant_name="Amazon",    merchant_category="Shopping",      transaction_date=date(2026, 5, 18), transaction_type="debit"),
+            AccountTransaction(account_number="8888", amount=Decimal("50"),    merchant_name="PayTM",     merchant_category="Utilities",     transaction_date=date(2026, 5, 15), transaction_type="debit"),
+            AccountTransaction(account_number="8888", amount=Decimal("2400"),  merchant_name="Netflix",   merchant_category="Entertainment", transaction_date=date(2026, 5, 10), transaction_type="debit"),
+            AccountTransaction(account_number="8888", amount=Decimal("150"),   merchant_name="McDonald's",merchant_category="Food",          transaction_date=date(2026, 5, 8),  transaction_type="debit"),
+            AccountTransaction(account_number="8888", amount=Decimal("10000"), merchant_name="Rent",      merchant_category="Housing",       transaction_date=date(2026, 5, 1),  transaction_type="debit"),
+            # Account 9999 — Current
+            AccountTransaction(account_number="9999", amount=Decimal("500"),   merchant_name="Zomato",         merchant_category="Food",        transaction_date=date(2026, 5, 24), transaction_type="debit"),
+            AccountTransaction(account_number="9999", amount=Decimal("3500"),  merchant_name="Apple Store",    merchant_category="Electronics", transaction_date=date(2026, 5, 21), transaction_type="debit"),
+            AccountTransaction(account_number="9999", amount=Decimal("200"),   merchant_name="Uber",           merchant_category="Transport",   transaction_date=date(2026, 5, 19), transaction_type="debit"),
+            AccountTransaction(account_number="9999", amount=Decimal("7500"),  merchant_name="HDFC EMI",       merchant_category="Finance",     transaction_date=date(2026, 5, 15), transaction_type="debit"),
+            AccountTransaction(account_number="9999", amount=Decimal("1800"),  merchant_name="Myntra",         merchant_category="Shopping",    transaction_date=date(2026, 5, 12), transaction_type="debit"),
+            AccountTransaction(account_number="9999", amount=Decimal("75"),    merchant_name="JioMart",        merchant_category="Groceries",   transaction_date=date(2026, 5, 10), transaction_type="debit"),
+            AccountTransaction(account_number="9999", amount=Decimal("25000"), merchant_name="Client Payment", merchant_category="Business",    transaction_date=date(2026, 5, 5),  transaction_type="credit"),
+            AccountTransaction(account_number="9999", amount=Decimal("450"),   merchant_name="Starbucks",      merchant_category="Food",        transaction_date=date(2026, 5, 3),  transaction_type="debit"),
+            # Account 7777 — Credit
+            AccountTransaction(account_number="7777", amount=Decimal("300"),   merchant_name="Domino's",      merchant_category="Food",          transaction_date=date(2026, 5, 26), transaction_type="debit"),
+            AccountTransaction(account_number="7777", amount=Decimal("1500"),  merchant_name="H&M",           merchant_category="Clothing",      transaction_date=date(2026, 5, 23), transaction_type="debit"),
+            AccountTransaction(account_number="7777", amount=Decimal("600"),   merchant_name="BookMyShow",    merchant_category="Entertainment", transaction_date=date(2026, 5, 20), transaction_type="debit"),
+            AccountTransaction(account_number="7777", amount=Decimal("2500"),  merchant_name="Laptop Repair", merchant_category="Electronics",   transaction_date=date(2026, 5, 17), transaction_type="debit"),
+            AccountTransaction(account_number="7777", amount=Decimal("100"),   merchant_name="FreshMenu",     merchant_category="Food",          transaction_date=date(2026, 5, 14), transaction_type="debit"),
+            AccountTransaction(account_number="7777", amount=Decimal("3000"),  merchant_name="SBI EMI",       merchant_category="Finance",       transaction_date=date(2026, 5, 10), transaction_type="debit"),
+            AccountTransaction(account_number="7777", amount=Decimal("200"),   merchant_name="Rapido",        merchant_category="Transport",     transaction_date=date(2026, 5, 7),  transaction_type="debit"),
+            AccountTransaction(account_number="7777", amount=Decimal("50"),    merchant_name="Cafe Coffee Day",merchant_category="Food",         transaction_date=date(2026, 5, 4),  transaction_type="debit"),
+            # Account 6666 — Salary
+            AccountTransaction(account_number="6666", amount=Decimal("50000"), merchant_name="Salary",            merchant_category="Income",    transaction_date=date(2026, 5, 1),  transaction_type="credit"),
+            AccountTransaction(account_number="6666", amount=Decimal("1200"),  merchant_name="BESCOM Electricity", merchant_category="Utilities", transaction_date=date(2026, 5, 2),  transaction_type="debit"),
+            AccountTransaction(account_number="6666", amount=Decimal("800"),   merchant_name="Airtel Recharge",    merchant_category="Utilities", transaction_date=date(2026, 5, 3),  transaction_type="debit"),
+            AccountTransaction(account_number="6666", amount=Decimal("3000"),  merchant_name="SIP Investment",     merchant_category="Finance",   transaction_date=date(2026, 5, 5),  transaction_type="debit"),
+            AccountTransaction(account_number="6666", amount=Decimal("300"),   merchant_name="Meesho",             merchant_category="Shopping",  transaction_date=date(2026, 5, 12), transaction_type="debit"),
+            AccountTransaction(account_number="6666", amount=Decimal("150"),   merchant_name="Chai Point",         merchant_category="Food",      transaction_date=date(2026, 5, 15), transaction_type="debit"),
+            AccountTransaction(account_number="6666", amount=Decimal("2000"),  merchant_name="Petrol",             merchant_category="Transport", transaction_date=date(2026, 5, 18), transaction_type="debit"),
+            AccountTransaction(account_number="6666", amount=Decimal("5500"),  merchant_name="Flipkart",           merchant_category="Shopping",  transaction_date=date(2026, 5, 22), transaction_type="debit"),
+        ]
+        for tx in demo_transactions:
+            db.add(tx)
+
+        print("Seeding awaiting_acc_no demo conversations...")
+        shreya = customer_map["Shreya Banerjee"]
+        varun = customer_map["Varun Pillai"]
+
+        # Shreya: fraud dispute, linked to account 7777 (Credit Account)
+        conv_shreya = Conversation(
+            customer_id=shreya.id,
+            assigned_agent_id=agent_support.id,
+            status=ConversationStatus.awaiting_acc_no,
+            active_channels_json=json.dumps(["email"]),
+            topic="Disputed transaction on my account",
+            last_message_at=ago(minutes=6),
+            linked_account_number="7777",
+        )
+        db.add(conv_shreya)
+        await db.flush()
+
+        db.add(Message(
+            conversation_id=conv_shreya.id,
+            sender_type=SenderType.customer,
+            direction=MessageDirection.inbound,
+            channel="email",
+            content=(
+                "Hello NeoBank Support,\n\n"
+                "I noticed an unauthorized debit of ₹2,500 from my account on 20th May. "
+                "I did not make any such payment. The merchant name shows as 'UNKNOWN_MERCH_INT'. "
+                "This looks like a fraudulent charge. Please investigate and refund this amount immediately.\n\n"
+                "Regards,\nShreya Banerjee"
+            ),
+            status=MessageStatus.read,
+            created_at=ago(minutes=10),
+        ))
+        db.add(Message(
+            conversation_id=conv_shreya.id,
+            sender_type=SenderType.system,
+            direction=MessageDirection.outbound,
+            channel="email",
+            content=_PAYMENT_AUTO_REPLY_SEED,
+            status=MessageStatus.read,
+            created_at=ago(minutes=8),
+        ))
+        db.add(Message(
+            conversation_id=conv_shreya.id,
+            sender_type=SenderType.customer,
+            direction=MessageDirection.inbound,
+            channel="email",
+            content="My account number is 7777.",
+            status=MessageStatus.read,
+            created_at=ago(minutes=7),
+        ))
+        db.add(Message(
+            conversation_id=conv_shreya.id,
+            sender_type=SenderType.system,
+            direction=MessageDirection.outbound,
+            channel="email",
+            content="Account 7777 linked successfully! Our team can now see your transaction history and will assist you shortly.\n— NeoBank Support Team",
+            status=MessageStatus.read,
+            created_at=ago(minutes=6),
+        ))
+        db.add(AISummary(
+            conversation_id=conv_shreya.id,
+            one_liner="Customer reports unauthorized ₹2,500 debit on May 20th — account 7777 linked, investigation pending.",
+            detailed_summary=(
+                "Shreya Banerjee emailed about an unauthorized debit of ₹2,500 on May 20th "
+                "from an unknown merchant 'UNKNOWN_MERCH_INT'. Account 7777 (Credit Account) is now linked. "
+                "Transaction history is available for review."
+            ),
+            key_issues_json=json.dumps(["Unauthorized debit", "Unknown merchant", "Possible fraud"]),
+            suggested_action="Review account 7777 transactions around May 20th, initiate chargeback if confirmed unauthorized.",
+            sentiment=SentimentType.frustrated,
+            model_used="seeded",
+        ))
+
+        # Varun: UPI overcharge, linked to account 6666 (Salary Account)
+        conv_varun = Conversation(
+            customer_id=varun.id,
+            assigned_agent_id=agent_support.id,
+            status=ConversationStatus.awaiting_acc_no,
+            active_channels_json=json.dumps(["email"]),
+            topic="Wrong amount charged on UPI transfer",
+            last_message_at=ago(minutes=19),
+            linked_account_number="6666",
+        )
+        db.add(conv_varun)
+        await db.flush()
+
+        db.add(Message(
+            conversation_id=conv_varun.id,
+            sender_type=SenderType.customer,
+            direction=MessageDirection.inbound,
+            channel="email",
+            content=(
+                "Hi,\n\n"
+                "I made a UPI payment of ₹500 to a grocery store yesterday but my account "
+                "shows a debit of ₹5,000. I think I was overcharged by 10x. "
+                "Please check and refund the excess amount of ₹4,500 as soon as possible.\n\n"
+                "Thanks,\nVarun Pillai"
+            ),
+            status=MessageStatus.read,
+            created_at=ago(minutes=25),
+        ))
+        db.add(Message(
+            conversation_id=conv_varun.id,
+            sender_type=SenderType.system,
+            direction=MessageDirection.outbound,
+            channel="email",
+            content=_PAYMENT_AUTO_REPLY_SEED,
+            status=MessageStatus.read,
+            created_at=ago(minutes=22),
+        ))
+        db.add(Message(
+            conversation_id=conv_varun.id,
+            sender_type=SenderType.customer,
+            direction=MessageDirection.inbound,
+            channel="email",
+            content="Account number is 6666.",
+            status=MessageStatus.read,
+            created_at=ago(minutes=20),
+        ))
+        db.add(Message(
+            conversation_id=conv_varun.id,
+            sender_type=SenderType.system,
+            direction=MessageDirection.outbound,
+            channel="email",
+            content="Account 6666 linked successfully! Our team can now see your transaction history and will assist you shortly.\n— NeoBank Support Team",
+            status=MessageStatus.read,
+            created_at=ago(minutes=19),
+        ))
+        db.add(AISummary(
+            conversation_id=conv_varun.id,
+            one_liner="UPI overcharge — ₹500 payment debited as ₹5,000 — account 6666 linked, refund review pending.",
+            detailed_summary=(
+                "Varun Pillai reports a UPI payment discrepancy: intended to pay ₹500 but was "
+                "charged ₹5,000. Claims overcharge of ₹4,500. Account 6666 (Salary Account) is now linked. "
+                "Transaction history available for verification."
+            ),
+            key_issues_json=json.dumps(["UPI overcharge", "Wrong amount debited", "Refund required"]),
+            suggested_action="Check account 6666 UPI transaction logs for yesterday's grocery payment, initiate refund for excess ₹4,500 if confirmed.",
+            sentiment=SentimentType.negative,
+            model_used="seeded",
+        ))
+
         print("Seeding DNC list...")
         from app.models import DNCEntry, IdentifierType
-        dnc_entries = [
-            ("+919988776655", IdentifierType.phone),
-            ("+919977665544", IdentifierType.phone),
-            ("+919966554433", IdentifierType.phone),
-            ("optout.customer@hotmail.com", IdentifierType.email),
-            ("nospam@rediffmail.com", IdentifierType.email),
-            ("+911800000000", IdentifierType.phone),
-            ("donotcontact@yahoo.com", IdentifierType.email),
+        dnc_emails = [
+            "optout.customer@hotmail.com",
+            "nospam@rediffmail.com",
+            "donotcontact@yahoo.com",
+            "unsubscribe.me@gmail.com",
+            "no.marketing@outlook.com",
+            "remove.from.list@gmail.com",
+            "privacy.first@protonmail.com",
         ]
-        for identifier, id_type in dnc_entries:
-            db.add(DNCEntry(identifier=identifier, identifier_type=id_type, is_active=True))
+        for email in dnc_emails:
+            db.add(DNCEntry(identifier=email, identifier_type=IdentifierType.email, is_active=True))
 
         await db.commit()
 
@@ -509,7 +736,7 @@ async def seed():
 
     print(f"\n[OK] Seeded {c_count} customers, {conv_count} conversations, {msg_count} messages")
     print(f"[OK] {camp_count} campaigns, {dnc_count} DNC entries")
-    print("[OK] Open: 8 | Waiting: 3 | Resolved: 3 | Closed: 1")
+    print("[OK] Open: 8 | Waiting: 3 | Awaiting Acc No: 2 | Resolved: 3 | Closed: 1")
     print("[OK] Admin: admin@neobank.com / admin123")
     print("[OK] Agent: agent@neobank.com / agent123")
 

@@ -22,6 +22,7 @@ class OutboundEvent:
     media_url: str | None = None
     subject: str | None = None        # email: reply subject line
     in_reply_to: str | None = None    # email: Message-ID of the email being replied to
+    references: str | None = None     # email: full chain of Message-IDs for References header
 
 
 inbound_queue: asyncio.Queue[InboundEvent] = asyncio.Queue()

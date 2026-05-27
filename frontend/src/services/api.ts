@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Conversation, Message, Customer, Transaction, AISummary, Campaign, DNCEntry } from '../types'
+import type { Conversation, Message, Customer, Transaction, AISummary, Campaign, DNCEntry, AccountTransaction } from '../types'
 
 const client = axios.create({ baseURL: '/api/v1' })
 
@@ -88,6 +88,11 @@ export const compliance = {
   removeDnc: (id: string) => client.delete(`/compliance/dnc-list/${id}`).then((r) => r.data),
   consent: (customer_id: string) =>
     client.get(`/compliance/consent/${customer_id}`).then((r) => r.data),
+}
+
+export const accounts = {
+  get: (accNo: string) => client.get(`/accounts/${accNo}`).then((r) => r.data),
+  transactions: (accNo: string) => client.get(`/accounts/${accNo}/transactions`).then((r) => r.data as AccountTransaction[]),
 }
 
 export const analytics = {

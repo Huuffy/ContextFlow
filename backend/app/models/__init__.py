@@ -8,6 +8,7 @@ from .document import UploadedDocument, FileType
 from .compliance import ConsentRecord, DNCEntry, ConsentType, ConsentStatus, IdentifierType
 from .campaign import Campaign, CampaignStatus
 from .transaction import Transaction
+from .bank_account import BankAccount, AccountTransaction
 
 __all__ = [
     "Base",
@@ -20,4 +21,5 @@ __all__ = [
     "ConsentRecord", "DNCEntry", "ConsentType", "ConsentStatus", "IdentifierType",
     "Campaign", "CampaignStatus",
     "Transaction",
+    "BankAccount", "AccountTransaction",
 ]

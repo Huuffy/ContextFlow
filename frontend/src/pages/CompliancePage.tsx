@@ -131,29 +131,6 @@ export default function CompliancePage() {
           )}
         </div>
 
-        {/* Legacy phone entries (seeded / older) */}
-        {otherEntries.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <p className="text-sm font-medium text-gray-500">Legacy phone entries</p>
-              <p className="text-xs text-gray-400 mt-0.5">Imported from previous system — email is now the primary key</p>
-            </div>
-            {otherEntries.map((entry) => (
-              <div key={entry.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">{entry.identifier}</p>
-                  <p className="text-xs text-gray-400 capitalize">{entry.identifier_type}</p>
-                </div>
-                <button
-                  onClick={() => remove(entry.id)}
-                  className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
 
       </div>
     </div>

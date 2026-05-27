@@ -27,6 +27,7 @@ async def send_email(
     # Thread headers — keeps replies in the same Gmail/Outlook thread
     if in_reply_to:
         msg["In-Reply-To"] = in_reply_to
+        # References must include the full chain; at minimum the same message-id
         msg["References"] = references or in_reply_to
 
     msg.attach(MIMEText(body, "plain"))

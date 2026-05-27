@@ -244,7 +244,7 @@ export default function InboxPage() {
   const [tab, setTab] = useState<'active' | 'history'>('active')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string[]>([])
-  const [panelWidth, setPanelWidth] = useState(300)
+  const [panelWidth, setPanelWidth] = useState(320)
   const [showTestModal, setShowTestModal] = useState(false)
 
   const dragging = useRef(false)
@@ -345,7 +345,7 @@ export default function InboxPage() {
       <div className="flex-1 flex overflow-hidden min-h-0">
 
         {/* Left panel — resizable */}
-        <div style={{ width: panelWidth, flexShrink: 0 }} className="overflow-hidden flex flex-col min-h-0">
+        <div style={{ width: panelWidth, flexShrink: 0 }} className="overflow-hidden flex flex-col min-h-0 min-w-0">
           <ConversationList
             conversations={filtered}
             onSelect={setActive}

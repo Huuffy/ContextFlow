@@ -97,7 +97,7 @@ export default function ConversationList({
   const hasFilter = statusFilter.length > 0
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 border-r border-gray-200 overflow-hidden min-h-0">
+    <div className="h-full w-full flex flex-col bg-gray-50 border-r border-gray-200 overflow-hidden min-h-0">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 bg-white border-b border-gray-100 flex-shrink-0">
         <h2 className="text-base font-bold text-gray-900 mb-3">Inbox</h2>

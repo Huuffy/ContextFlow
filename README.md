@@ -1,6 +1,6 @@
-<div align="center">
+﻿<div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0f3833&height=220&section=header&text=ContextFlow&fontSize=64&fontColor=14b8a6&animation=fadeIn&desc=Omni-Channel%20Customer%20Communication%20Platform&descSize=18&descAlignY=75&descAlign=50" width="100%" />
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0f3833&height=220&section=header&text=ContextFlow&fontSize=64&fontColor=14b8a6&animation=fadeIn&desc=Team%20CloudCompute&descSize=18&descAlignY=75&descAlign=50" width="100%" />
 
 <br/>
 
@@ -14,239 +14,223 @@
 
 <br/>
 
-> **idea 2.0 Hackathon 2026 · Team CloudCompute**
->
-> Unify WhatsApp · Instagram · Email · Telegram into one AI-powered agent inbox.  
-> Customers never repeat themselves. Agents always have full context.
+> **iDEA 2.0 Hackathon 2026 · Phase 2 Submission**
 
 </div>
 
 ---
 
-## The Problem
+## Omni-Channel Customer Communication Digital Platform
 
-India's Public Sector Banks, Regional Rural Banks, and Co-operative Banks collectively serve over a billion customers — yet their customer communication infrastructure remains deeply fragmented. A customer who raises a loan query on WhatsApp, follows up via email, and calls the branch is treated as three separate interactions by three separate teams with no shared context. Agents waste time asking questions already answered on another channel. Complaint resolution is slow. Regulatory mandates — from RBI's customer grievance guidelines to consent-based marketing rules — are difficult to enforce when communication is scattered across personal inboxes and WhatsApp groups. Meanwhile, the marketing teams operating these banks have no scalable way to send compliant, personalised outreach across multiple channels simultaneously. ContextFlow solves all of this in a single deployable platform: every inbound message from any channel lands in one unified inbox with AI-generated context, every outbound campaign passes a compliance gate before dispatch, and every customer's right to opt out is honoured instantly across all channels the moment they reply `opt out`.
+This project addresses the challenge of fragmented customer communication in Indian banking. India's Public Sector Banks, Regional Rural Banks, and Co-operative Banks collectively serve over a billion customers - yet every channel they operate on is siloed. A customer raising a loan query on WhatsApp, following up over email, and messaging on Instagram is treated as three separate people by three separate teams. Agents have no shared context, ask the same questions repeatedly, and resolution times suffer.
 
----
-
-## Channel Integration
+ContextFlow solves this with a single AI-powered agent inbox that accepts inbound messages from WhatsApp, Instagram, Email, and Telegram simultaneously. All messages - regardless of which channel they arrive on - are identity-resolved to one customer record and presented as a single unified conversation thread. Agents always see the full picture. No customer ever has to repeat themselves.
 
 <div align="center">
 
-| Channel | Integration | Direction | Status |
-|:---:|---|---|:---:|
-| <img src="https://img.shields.io/badge/WhatsApp-25d366?style=flat-square&logo=whatsapp&logoColor=white" /> | Meta Cloud API · Webhooks | Inbound + Outbound | ✅ Live |
-| <img src="https://img.shields.io/badge/Instagram-e1306c?style=flat-square&logo=instagram&logoColor=white" /> | Meta Cloud API · Webhooks | Inbound + Outbound | ✅ Live |
-| <img src="https://img.shields.io/badge/Email-0078d4?style=flat-square&logo=gmail&logoColor=white" /> | Gmail IMAP poller + SMTP | Inbound + Outbound | ✅ Live |
-| <img src="https://img.shields.io/badge/Telegram-26a5e4?style=flat-square&logo=telegram&logoColor=white" /> | Telegram Bot API · Long polling | Inbound + Outbound | ✅ Live |
+| Channel | Integration | Direction |
+|:---:|---|---|
+| <img src="https://img.shields.io/badge/WhatsApp-25d366?style=flat-square&logo=whatsapp&logoColor=white" /> | Meta Cloud API · Webhooks | Inbound + Outbound |
+| <img src="https://img.shields.io/badge/Instagram-e1306c?style=flat-square&logo=instagram&logoColor=white" /> | Meta Cloud API · Webhooks | Inbound + Outbound |
+| <img src="https://img.shields.io/badge/Email-0078d4?style=flat-square&logo=gmail&logoColor=white" /> | Gmail IMAP + SMTP | Inbound + Outbound |
+| <img src="https://img.shields.io/badge/Telegram-26a5e4?style=flat-square&logo=telegram&logoColor=white" /> | Telegram Bot API · Long polling | Inbound + Outbound |
 
 </div>
 
-WhatsApp and Instagram are both served through the **Meta Cloud API** — a single webhook endpoint at `/api/webhooks/meta` handles both platforms. Messages from either channel are identity-resolved to the customer's golden record and appear in the same unified thread.
+---
+
+## Live Demo
+
+🔗 **Live Demo:** [https://contextflow.cloudcompute.live](https://contextflow.cloudcompute.live) 
+🎥 **Demo Video:** *(coming soon)*
 
 ---
 
-## Architecture
+## Tech Stack
 
-![ContextFlow Architecture](Resources/architecture.png)
-
-> **Full message flow:** Inbound channels (WhatsApp · Instagram · Gmail · Telegram) → FastAPI inbound handler → identity resolution → SQLite persistence → GPT-4o AI pipeline (summary + sentiment) → WebSocket push to agent dashboard → agent reply → DNC compliance check → outbound dispatch across all channels. Campaign flow runs separately with whitelist management and per-send DNC enforcement.
-
----
-
-## Modules
-
-### 💬 Inbox
-
-Banks handle thousands of inbound customer queries daily, arriving across WhatsApp, email, Instagram DMs, and Telegram simultaneously. Without a unified view, agents switch between apps, lose thread history, and repeatedly ask customers to re-explain their problem — damaging trust and inflating resolution time. The Inbox solves this with a three-panel layout: a conversation list on the left (filterable by Open, Awaiting Reply, Resolved, Closed), a full message thread in the centre showing every message across all channels in chronological order, and the Customer 360 panel on the right. Messages arrive in real time via WebSocket — no page refresh needed. The ticket lifecycle is automated: when an agent replies the ticket moves to **Awaiting Reply**; when the customer responds it snaps back to **Open**. Agents can close a ticket with one click. Every first contact on email or Telegram receives an instant automated acknowledgement so customers know their query has been received, without the agent having to manually respond before reading the full context.
-
----
-
-### 🧠 Customer 360
-
-One of the most common complaints in banking support is customers having to repeat themselves — "I already explained this to someone else." This happens because agents have no cross-channel view of who the customer is or what they've discussed before. The Customer 360 panel, shown alongside every conversation, assembles the complete picture: the customer's registered channels, transaction history, and a GPT-4o-generated AI summary that updates after every new message. The summary includes a one-liner for quick scanning, detailed context, key issues raised, a suggested next action for the agent, and a sentiment badge (`positive`, `neutral`, `negative`, or `frustrated`). Agents can regenerate the summary on demand. This means the very first thing an agent sees when they open a conversation is not a blank screen — it is an intelligent briefing.
-
----
-
-### 📣 Campaigns
-
-Banks regularly need to reach customers proactively — KYC renewal deadlines, new product offers, regulatory notices, festive season promotions. Today this is done via fragmented tools: a bulk SMS vendor, a separate email platform, WhatsApp broadcasts managed in personal numbers. There is no approval gate, no compliance check, and no way to track delivery across channels in one place. ContextFlow's Campaigns module introduces a proper multi-channel outreach workflow. Bank staff compose a message template with `{{name}}` personalisation, select target channels (WhatsApp, Email, Telegram, Instagram), and submit for management review. During the approval step, the approving manager sees the full registered contact list pulled from the whitelist — they can search contacts, deselect individuals, and lock in the final recipient list before approving. Any contact on the Do Not Contact list is automatically flagged and excluded. Once approved, the campaign dispatches personalised messages to all locked recipients across the selected channels concurrently, with delivery counts updated in real time. Contacts register via the public landing page form, providing their email (required) and optional WhatsApp number and Telegram ID.
+- **Python 3.12** - backend runtime
+- **FastAPI** - async REST API and WebSocket server
+- **SQLAlchemy (async) + aiosqlite** - SQLite database, no external DB required
+- **LanceDB** - local vector store for message embeddings
+- **sentence-transformers / all-MiniLM-L6-v2** - local embedding model, runs on CPU, no API call
+- **Azure OpenAI GPT-4o** - conversation summarisation, sentiment classification, suggested actions
+- **React 19 + TypeScript** - frontend
+- **Vite** - frontend build tool
+- **Tailwind CSS 4 + shadcn/ui** - UI components and design system
+- **Zustand** - frontend state management
+- **Framer Motion** - UI animations
+- **Meta Cloud API** - WhatsApp and Instagram via a single shared webhook
+- **Gmail IMAP + SMTP (aiosmtplib)** - email inbound polling and outbound delivery
+- **Telegram Bot API** - long polling inbound, Bot API outbound
+- **WebSocket (FastAPI native)** - real-time agent dashboard updates
+- **pnpm** - frontend package manager
+- **uv** - Python dependency and virtualenv management
 
 ---
 
-### 🛡️ Compliance
-
-RBI guidelines mandate that banks maintain and honour Do Not Contact lists, provide customers with a mechanism to opt out of marketing communications, and ensure no outbound message is sent to a customer who has withdrawn consent. Without a centralised system enforcing these rules, a single rogue bulk send can result in regulatory action. ContextFlow's Compliance module provides an email-keyed DNC list: one entry by email address blocks that customer across **all channels simultaneously** — WhatsApp, Instagram, Email, and Telegram — because the block is applied at the customer identity level, not at the channel level. Customers can self-opt-out at any time by replying with exactly `opt out` on any channel; the system immediately adds their email to the DNC list and sends an acknowledgement. Bank staff can also manually add or remove entries from the Compliance page. Every outbound message — whether an agent reply or a campaign dispatch — passes a DNC check before sending. If the customer is blocked, the message is silently dropped and logged.
-
----
-
-### 📊 Analytics
-
-Bank management and team leads need visibility into support operations — how many queries are open, which channels are busiest, what the overall customer sentiment looks like, and whether message volumes are trending up or down. Without this, staffing decisions are made blindly and sentiment deterioration goes unnoticed until escalations. The Analytics page surfaces KPI cards (total conversations, open tickets, messages sent/received, DNC entries), a message volume trend chart over the last 7 days, a channel distribution breakdown, and a sentiment distribution across all conversations. All data is computed live from the SQLite database — no separate data warehouse required.
-
----
-
-## AI Pipeline
-
-Every inbound message triggers a pipeline powered by **GPT-4o**:
-
-1. **Identity resolution** — maps any channel identifier (WhatsApp phone, Instagram IGSID, email address, Telegram chat ID) to a single customer golden record via the `channel_identifiers` table
-2. **Auto-reply** — first-contact acknowledgement sent back on the same channel in-thread; email replies use `In-Reply-To` so they appear inside the same Gmail/Outlook thread rather than as a new email
-3. **Opt-out detection** — customer replies exactly `opt out` on any channel → email added to DNC list → acknowledgement sent back → all future outbound blocked instantly
-4. **Summarisation** — one-liner + detailed summary with key issues and suggested action, regenerated on every new message
-5. **Sentiment classification** — `positive | neutral | negative | frustrated`
-
-Embeddings via `sentence-transformers/all-MiniLM-L6-v2` run locally (no API call) and are stored in **LanceDB** for RAG-ready knowledge-base retrieval. The embedding model loads in a background thread at startup — the server is ready to accept requests in under one second.
-
----
-
-## Quick Start
+## How to Run Locally
 
 **Prerequisites:** Python 3.12+, Node.js 20+, pnpm
 
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Huuffy/ContextFlow.git
+   cd ContextFlow/contextflow
+   ```
+
+2. Set up environment variables:
+   ```bash
+   cd backend
+   cp .env.example .env
+   # Edit .env - fill in Azure OpenAI, Gmail, Telegram, and Meta API keys
+   ```
+
+3. Install backend dependencies:
+   ```bash
+   uv venv && uv pip install -r requirements.txt
+   ```
+
+4. Seed demo data (20 customers, 15 conversations, 5 campaigns):
+   ```bash
+   uv run python -m app.scripts.seed_db
+   ```
+
+5. Start the backend:
+   ```bash
+   uv run uvicorn app.main:app --reload --port 8000
+   ```
+
+6. Install frontend dependencies and start the dev server:
+   ```bash
+   cd ../frontend
+   pnpm install
+   pnpm dev
+   ```
+
+7. Open the app: [http://localhost:5173](http://localhost:5173)
+
+**One-command launcher (Windows):**
 ```bash
-# Clone
-git clone https://github.com/Huuffy/ContextFlow.git
-cd ContextFlow
-
-# Backend
-cd backend
-uv venv && uv pip install -r requirements.txt
-cp .env.example .env          # fill in keys (see Environment Variables below)
-uv run python -m app.scripts.seed_db   # seeds 20 customers, 15 conversations, 5 campaigns
-uv run uvicorn app.main:app --reload --port 8000
-
-# Frontend (new terminal)
-cd frontend
-pnpm install
-pnpm dev
-```
-
-Open [http://localhost:5173](http://localhost:5173)
-
-Or from the project root (Windows):
-
-```bash
-python run.py    # opens backend + frontend in separate terminal windows
-```
-
----
-
-## Environment Variables
-
-Create `backend/.env`:
-
-```env
-# GPT-4o (required for AI summaries)
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_API_KEY=your_key
-AZURE_OPENAI_DEPLOYMENT=gpt-4o
-
-# Meta Cloud API — WhatsApp + Instagram
-WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
-META_ACCESS_TOKEN=your_access_token
-WHATSAPP_VERIFY_TOKEN=your_verify_token
-META_APP_SECRET=your_app_secret
-INSTAGRAM_PAGE_ID=your_page_id
-
-# Gmail — Email channel
-GMAIL_ADDRESS=your@gmail.com
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
-
-# Telegram — Telegram channel
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
-TELEGRAM_USE_POLLING=true
+python run.py    # starts backend and frontend in separate terminal windows
 ```
 
 ---
 
 ## Project Structure
 
-```
-contextflow/
-├── backend/
-│   ├── app/
-│   │   ├── api/v1/          # REST endpoints
-│   │   │   ├── conversations, messages, customers
-│   │   │   ├── campaigns    # draft → review → approve (with recipient lock) → dispatch
-│   │   │   ├── compliance   # DNC list CRUD + is_customer_blocked()
-│   │   │   ├── register     # contact registration → whitelist.json + DB
-│   │   │   ├── analytics    # live KPI aggregation
-│   │   │   └── ai           # summary regeneration endpoint
-│   │   ├── api/webhooks/    # meta.py (WhatsApp + Instagram), telegram.py
-│   │   ├── events/          # inbound_worker, outbound_worker, asyncio queues
-│   │   ├── integrations/    # email_client, email_poller, telegram_client, telegram_poller
-│   │   │                    # whatsapp.py, instagram.py (Meta Cloud API dispatch)
-│   │   ├── models/          # SQLAlchemy models (SQLite via aiosqlite)
-│   │   ├── services/        # identity_resolution, message_service
-│   │   ├── ai/              # summarizer (GPT-4o), embedder (MiniLM + LanceDB)
-│   │   └── scripts/         # seed_db.py
-│   └── data/                # SQLite DB + LanceDB vector store (gitignored)
-├── frontend/
-│   ├── src/
-│   │   ├── layouts/         # DashboardLayout (collapsible sidebar, home navigation)
-│   │   ├── pages/
-│   │   │   ├── inbox/       # InboxPage, ConversationList, ConversationThread, Customer360Panel
-│   │   │   ├── CampaignsPage.tsx   # resizable two-panel, recipient picker, dispatch
-│   │   │   ├── CompliancePage.tsx  # DNC management
-│   │   │   ├── AnalyticsPage.tsx
-│   │   │   └── HomePage.tsx        # landing page + registration modal
-│   │   ├── services/        # api.ts (Axios)
-│   │   ├── stores/          # conversationStore (Zustand)
-│   │   └── hooks/           # useWebSocket
-│   └── public/
-├── whitelist.json           # registered contacts for campaign dispatch
-└── run.py                   # launcher script (Windows)
-```
+![ContextFlow Architecture](Resources/architecture.png)
+
+`/backend/app/api/v1/` - REST endpoints: conversations, messages, customers, campaigns, compliance, analytics, AI summary regeneration
+
+`/backend/app/api/webhooks/` - Meta Cloud API handler (WhatsApp + Instagram on a single endpoint), Telegram webhook handler
+
+`/backend/app/events/` - inbound worker (identity resolution, opt-out detection, auto-replies), outbound delivery queue, campaign scheduler (60s IST-based timed dispatch)
+
+`/backend/app/integrations/` - Gmail IMAP poller and SMTP client, Telegram poller and client, WhatsApp and Instagram dispatch via Meta Cloud API
+
+`/backend/app/models/` - SQLAlchemy ORM models (customers, conversations, messages, campaigns, DNC list, channel identifiers)
+
+`/backend/app/services/` - identity resolution service (maps any channel ID to one customer record), message persistence service
+
+`/backend/app/ai/` - GPT-4o summariser and sentiment classifier, MiniLM embedding model with LanceDB vector store
+
+`/backend/app/scripts/seed_db.py` - generates the full demo environment (20 customers, 15 conversations, 5 campaigns, 7 DNC entries)
+
+`/backend/data/` - SQLite database and LanceDB vector store (gitignored)
+
+`/frontend/src/pages/inbox/` - three-panel agent inbox (conversation list, message thread, Customer 360)
+
+`/frontend/src/pages/` - CampaignsPage, CompliancePage, AnalyticsPage, HomePage (public landing + registration modal)
+
+`/frontend/src/services/api.ts` - Axios API client for all backend calls
+
+`/whitelist.json` - registered contacts collected via the landing page, used for campaign dispatch
+
+`/run.py` - Windows one-command launcher (starts backend and frontend in separate terminals)
+
+`/Resources/architecture.png` - system architecture diagram
 
 ---
 
-## Tech Stack
+## Modules
 
-<div align="center">
+### 💬 Unified Inbox
+Three-panel layout: conversation list (Open · Awaiting Reply · Resolved · Closed), full cross-channel message thread, and Customer 360. Messages arrive in real time via WebSocket. Ticket state is automated - agent reply → **Awaiting Reply**, customer response → **Open**. First contact on email and Telegram gets an instant acknowledgement automatically.
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, Zustand, Framer Motion |
-| Backend | FastAPI, Python 3.12, SQLAlchemy async, aiosqlite (SQLite) |
-| Vector Store | LanceDB + `sentence-transformers/all-MiniLM-L6-v2` (local, no API) |
-| AI | GPT-4o — summaries, sentiment, suggested actions |
-| Real-time | WebSocket (FastAPI native) |
-| WhatsApp & Instagram | Meta Cloud API — single webhook endpoint, both platforms |
-| Email | Gmail IMAP poller + SMTP (aiosmtplib), threaded via `In-Reply-To` |
-| Telegram | Telegram Bot API, long polling |
-| Campaign Recipients | `whitelist.json` — contacts registered via landing page form |
+### 🧠 Customer 360 & AI Summary
+GPT-4o generates a summary after every new message: one-liner, detailed context, key issues, suggested next action, and sentiment badge (`positive` · `neutral` · `negative` · `frustrated`). Agents read an intelligent briefing before they respond.
 
-</div>
+### 📣 Campaigns
+Multi-channel outreach with approval workflow. Staff draft a template with `{{name}}` personalisation, select channels, and submit for review. The manager locks the final recipient list and excludes DNC contacts. Campaigns dispatch immediately or on a **scheduled IST time** - the scheduler fires missed campaigns automatically on server restart.
+
+### 🛡️ Compliance
+Email-keyed DNC list blocks a customer across all channels simultaneously. Replying `opt out` (any capitalisation) on any channel adds them to DNC instantly and sends a confirmation. Every campaign message includes the opt-out instruction.
+
+### 📊 Analytics
+KPI cards, 7-day message volume trend, channel distribution, and sentiment breakdown - all computed live from SQLite.
 
 ---
 
-## Demo Data
+## Dataset
+ `No Dataset needed`
 
-Running `seed_db.py` populates a complete demo environment:
+All data is 100% synthetic, generated by our team written in `seed_db.py`. Is it flexible enough to handle Live Redis Bank Transactions database
 
-- **20 customers** with realistic Indian banking profiles and transaction histories
+Running the seed script populates a complete demo environment:
+
+- **20 customers** with realistic Indian banking names and profiles
 - **15 conversations** across all status states (`open`, `waiting`, `resolved`, `closed`)
-- **Multi-channel threads** — WhatsApp + Email, Telegram + Email, WhatsApp + Telegram
-- **5 campaigns** across the full lifecycle (draft · pending approval · approved · approved · approved)
+- **Multi-channel threads** - WhatsApp + Email, Telegram + Email, WhatsApp + Telegram
+- **5 campaigns** across the full lifecycle (draft · pending approval · approved · scheduled)
 - **7 DNC entries** simulating real opt-out records
-- All 4 sentiment variants across conversations: `positive`, `neutral`, `negative`, `frustrated`
+- **All 4 sentiment variants** across conversations: `positive`, `neutral`, `negative`, `frustrated`
+- **4 demo bank accounts** for the payment query flow:
+  - `8888` - Savings Account
+  - `9999` - Current Account
+  - `7777` - Credit Account
+  - `6666` - Salary Account
 
-Register contacts via the landing page to populate `whitelist.json` before dispatching campaigns.
+Contacts register via the landing page form to populate `whitelist.json` before dispatching campaigns. The registration form collects email (required), name, WhatsApp number, and Telegram ID.
 
 ---
 
-## License
+## Known Limitations
 
-Distributed under the **Apache License 2.0**. See [`LICENSE`](LICENSE) for details.
+- Banks currently managing customer queries across Calls, Emails etc have no single place to view or respond - agents switch between apps, losing context at every handoff.
+- Without a unified identity layer, the same customer appearing on two channels is treated as two different people; transaction history, past complaints, and prior resolutions are invisible to the agent handling the next query.
+- Transaction data visible to agents is siloed inside core banking systems; support staff have no way to see a customer's recent transactions alongside the conversation, making it impossible to resolve payment queries without escalation.
+- Marketing campaigns sent through separate tools (bulk SMS, personal WhatsApp numbers, third-party email tools) have no approval workflow, no DNC enforcement, and no delivery visibility - exposing banks to RBI regulatory risk.
+- Customer opt-outs made on one channel (e.g. email) do not automatically propagate to others (e.g. WhatsApp), meaning the same customer can receive unwanted messages on a different platform even after opting out.
+- There is currently no industry-standard mechanism for banks to link a customer's identity across channels - a customer who contacts the bank on WhatsApp and later emails is recorded as two separate cases with no connection between them.
+
+---
+
+## Team
+
+| Name | Role |
+|---|---|
+| **Viraj Mukesh Bhatia** | Lead Full Stack Engineer & Cloud Architecture |
+| **Ankur Ravi Bodke** | Frontend Development & UI/UX |
+| **Aditya Jagdish Chaudhari** | Backend Architecture & AI Integration |
+| **Pranali Suryakant Bamne** | DevOps & System Infrastructure |
+
+
+
+---
+
+## Contact
+
+For any queries about this submission:
+
+- **Team:** CloudCompute
+- **Email:** [virajbhatia1611@gmail.com](mailto:virajbhatia1611@gmail.com)
+- **Institute:** Vidyavardhini's College of Engineering and Technology
 
 ---
 
 <div align="center">
 
-**Team CloudCompute · idea 2.0 Hackathon 2026**
-
-[neobanksupport@gmail.com](mailto:neobanksupport@gmail.com)
+**Team CloudCompute · iDEA 2.0 Hackathon 2026 · Phase 2**
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0f3833&height=120&section=footer" width="100%" />
 

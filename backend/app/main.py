@@ -77,6 +77,11 @@ async def lifespan(app: FastAPI):
         _worker_tasks.append(asyncio.create_task(run_telegram_poller(inbound_queue)))
         logger.info("Telegram poller started")
 
+    # Start campaign scheduler — checks every 60s for due scheduled campaigns
+    from app.events.campaign_scheduler import run_campaign_scheduler
+    _worker_tasks.append(asyncio.create_task(run_campaign_scheduler()))
+    logger.info("Campaign scheduler started")
+
     logger.info("Startup complete")
     yield
 

@@ -74,7 +74,7 @@ const COLOR_MAP: Record<string, { bg: string; text: string; border: string; ligh
 }
 
 const GMAIL_URL = 'https://mail.google.com/mail/u/0/#inbox?compose=new'
-const INBOX_EMAIL = 'virajbhatia1611@gmail.com'
+const INBOX_EMAIL = 'neobanksupport@gmail.com'
 
 function CopyEmailButton({ email }: { email: string }) {
   const [copied, setCopied] = useState(false)

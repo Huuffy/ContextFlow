@@ -361,10 +361,10 @@ export default function HomePage() {
             </span>
             <span className="hidden md:block text-teal-600">•</span>
             <a
-              href="mailto:virajbhatia1611@gmail.com"
+              href="mailto:neobanksupport@gmail.com"
               className="text-teal-400 hover:text-teal-300 transition-colors font-medium"
             >
-              virajbhatia1611@gmail.com
+              neobanksupport@gmail.com
             </a>
           </div>
 

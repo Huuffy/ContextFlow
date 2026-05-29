@@ -48,85 +48,9 @@ WhatsApp and Instagram are both served through the **Meta Cloud API** — a sing
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        INBOUND CHANNELS                         │
-│                                                                 │
-│  ┌──────────────────────┐        ┌──────────┐   ┌───────────┐  │
-│  │    META CLOUD API    │        │  Gmail   │   │ Telegram  │  │
-│  │                      │        │   IMAP   │   │ Bot API   │  │
-│  │  WhatsApp │Instagram │        │  Poller  │   │ Polling   │  │
-│  └──────────┬───────────┘        └────┬─────┘   └─────┬─────┘  │
-└─────────────┼────────────────────────┼───────────────┼─────────┘
-              │                        │               │
-              └────────────────────────┴───────────────┘
-                                       │
-                                       ▼
-                             FastAPI Inbound Handler
-                                       │
-                                       ▼
-                        asyncio.Queue  (inbound_queue)
-                                       │
-                                       ▼
-                               Inbound Worker
-                                       │
-                    ┌──────────────────┼─────────────────┐
-                    ▼                  ▼                  ▼
-           Identity Resolution   Opt-out Detection   Auto-reply
-         (channel ID → customer  ("opt out" → DNC   (first contact
-            golden record)        list + ack sent)   email/telegram)
-                    │
-                    ▼
-           Persist Message (SQLite)
-                    │
-                    ▼
-              GPT-4o Pipeline
-         ┌──────────┴──────────┐
-         ▼                     ▼
-    AI Summary            Sentiment
-  (one-liner +          positive / neutral
-  key issues +          negative / frustrated
- suggested action)
-         │
-         ▼
-  WebSocket Push ──▶ Agent Dashboard (React)
-                              │
-                    Agent composes reply
-                              │
-                              ▼
-           asyncio.Queue  (outbound_queue)
-                              │
-                              ▼
-                    DNC Compliance Check
-                    (email-keyed, blocks
-                     all channels at once)
-                              │
-         ┌────────────────────┼──────────────┬──────────────┐
-         ▼                    ▼              ▼              ▼
-     WhatsApp             Instagram        Email          Telegram
-  Meta Cloud API       Meta Cloud API   SMTP reply      Bot API send
-                                       (In-Reply-To
-                                        threading)
+![ContextFlow Architecture](Resources/architecture.png)
 
-─ ─ ─ ─ ─ ─ ─ ─ ─ ─  CAMPAIGN FLOW  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
-
-  Registration Form (landing page)
-         │
-         ▼
-  whitelist.json + Customer DB
-         │
-  Admin creates campaign draft
-         │
-         ▼
-  Submit for Review → Approval screen
-  (admin selects/locks recipients,
-   DNC contacts auto-excluded)
-         │
-         ▼
-  Dispatch → background worker sends
-  to locked whitelist via target channels
-  (DNC checked again at send time)
-```
+> **Full message flow:** Inbound channels (WhatsApp · Instagram · Gmail · Telegram) → FastAPI inbound handler → identity resolution → SQLite persistence → GPT-4o AI pipeline (summary + sentiment) → WebSocket push to agent dashboard → agent reply → DNC compliance check → outbound dispatch across all channels. Campaign flow runs separately with whitelist management and per-send DNC enforcement.
 
 ---
 
@@ -322,7 +246,7 @@ Distributed under the **Apache License 2.0**. See [`LICENSE`](LICENSE) for detai
 
 **Team CloudCompute · idea 2.0 Hackathon 2026**
 
-[virajbhatia1611@gmail.com](mailto:virajbhatia1611@gmail.com)
+[neobanksupport@gmail.com](mailto:neobanksupport@gmail.com)
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0f3833&height=120&section=footer" width="100%" />
 

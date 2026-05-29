@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Send, CheckCircle, Clock, AlertCircle, Megaphone, Trash2, ChevronRight, Loader2, Mail, Phone, MessageSquare, Monitor, Search, ShieldOff, Users, UserPlus } from 'lucide-react'
+import { Plus, Send, CheckCircle, Clock, AlertCircle, Megaphone, Trash2, ChevronRight, Loader2, Mail, Phone, MessageSquare, Monitor, Search, ShieldOff, Users, UserPlus, CalendarClock, X } from 'lucide-react'
 import { campaignsApi } from '../services/api'
 import type { Campaign } from '../types'
 import { RegisterModalWrapper } from '../components/RegisterModal'
@@ -32,15 +32,16 @@ const CHANNEL_COLORS: Record<string, string> = {
   simulator: 'bg-gray-100 text-gray-600',
 }
 
-type Filter = 'all' | 'draft' | 'pending_approval' | 'approved' | 'running' | 'completed'
+type Filter = 'all' | 'draft' | 'pending_approval' | 'approved' | 'scheduled' | 'running' | 'completed'
 
 const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'all',             label: 'All'     },
-  { key: 'draft',           label: 'Draft'   },
-  { key: 'pending_approval',label: 'Pending' },
-  { key: 'approved',        label: 'Approved'},
-  { key: 'running',         label: 'Live'    },
-  { key: 'completed',       label: 'Done'    },
+  { key: 'all',             label: 'All'       },
+  { key: 'draft',           label: 'Draft'     },
+  { key: 'pending_approval',label: 'Pending'   },
+  { key: 'approved',        label: 'Approved'  },
+  { key: 'scheduled',       label: 'Scheduled' },
+  { key: 'running',         label: 'Live'      },
+  { key: 'completed',       label: 'Done'      },
 ]
 
 // ─── New Campaign form state ────────────────────────────────────────────────
@@ -146,6 +147,17 @@ export default function CampaignsPage() {
       await campaignsApi.approve(id, lockedEmails)
       updateOne({ id, status: 'approved' })
       flash(`Campaign approved — ${lockedEmails.length} recipient${lockedEmails.length !== 1 ? 's' : ''} locked`)
+    } finally { setBusy(false) }
+  }
+
+  const handleSchedule = async (id: string, scheduledAt: string) => {
+    setBusy(true)
+    try {
+      await campaignsApi.schedule(id, scheduledAt)
+      updateOne({ id, status: 'scheduled', scheduled_at: scheduledAt })
+      const d = new Date(scheduledAt)
+      const ist = d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      flash(`Campaign scheduled for ${ist} IST`)
     } finally { setBusy(false) }
   }
 
@@ -282,6 +294,7 @@ export default function CampaignsPage() {
               onSubmit={handleSubmit}
               onApprove={handleApprove}
               onDispatch={handleDispatch}
+              onSchedule={handleSchedule}
               onCancel={handleCancel}
             />
           ) : (
@@ -491,16 +504,48 @@ function RecipientPicker({ campaignId, busy, onApprove }: {
   )
 }
 
-function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, onCancel }: {
+function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, onSchedule, onCancel }: {
   campaign: Campaign
   busy: boolean
   onSubmit: (id: string) => void
   onApprove: (id: string, lockedEmails: string[]) => void
   onDispatch: (id: string) => void
+  onSchedule: (id: string, scheduledAt: string) => void
   onCancel: (id: string) => void
 }) {
+  const [showScheduler, setShowScheduler] = useState(false)
+  const [scheduleInput, setScheduleInput] = useState('')
+
   const st = STATUS[c.status as keyof typeof STATUS] ?? STATUS.draft
-  const canCancel = ['draft', 'pending_approval', 'approved'].includes(c.status)
+  const canCancel = ['draft', 'pending_approval', 'approved', 'scheduled'].includes(c.status)
+
+  // Build default value for datetime-local: now + 1 hour in local time
+  const defaultScheduleValue = () => {
+    const d = new Date(Date.now() + 60 * 60 * 1000)
+    return d.toISOString().slice(0, 16)
+  }
+
+  const handleOpenScheduler = () => {
+    setScheduleInput(defaultScheduleValue())
+    setShowScheduler(true)
+  }
+
+  const handleConfirmSchedule = () => {
+    if (!scheduleInput) return
+    // datetime-local gives local time — convert to ISO with offset for backend
+    const localDate = new Date(scheduleInput)
+    onSchedule(c.id, localDate.toISOString())
+    setShowScheduler(false)
+  }
+
+  // Format scheduled_at in IST for display
+  const scheduledAtIST = c.scheduled_at
+    ? new Date(c.scheduled_at).toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    : null
 
   const deliveryRate = c.sent_count > 0
     ? Math.round((c.delivered_count / c.sent_count) * 100)
@@ -582,13 +627,72 @@ function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, on
         )}
 
         {c.status === 'approved' && (
-          <ActionButton
-            label="Dispatch Now"
-            icon={busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            color="bg-primary-600 hover:bg-primary-700 text-white"
-            disabled={busy}
-            onClick={() => onDispatch(c.id)}
-          />
+          <>
+            <ActionButton
+              label="Dispatch Now"
+              icon={busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              color="bg-primary-600 hover:bg-primary-700 text-white"
+              disabled={busy}
+              onClick={() => onDispatch(c.id)}
+            />
+            <ActionButton
+              label="Schedule for Later"
+              icon={<CalendarClock className="w-4 h-4" />}
+              color="bg-purple-600 hover:bg-purple-700 text-white"
+              disabled={busy}
+              onClick={handleOpenScheduler}
+            />
+          </>
+        )}
+
+        {/* Inline scheduler form */}
+        {showScheduler && c.status === 'approved' && (
+          <div className="w-full mt-2 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium text-purple-800 flex items-center gap-1.5">
+                <CalendarClock className="w-4 h-4" /> Schedule dispatch
+              </p>
+              <button onClick={() => setShowScheduler(false)} className="text-purple-400 hover:text-purple-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-purple-600 mb-3">
+              The campaign will send automatically at this time. Missed schedules fire immediately on backend restart.
+            </p>
+            <div className="flex items-center gap-3">
+              <input
+                type="datetime-local"
+                value={scheduleInput}
+                onChange={(e) => setScheduleInput(e.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+                className="border border-purple-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+              />
+              <button
+                onClick={handleConfirmSchedule}
+                disabled={!scheduleInput || busy}
+                className="flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                Confirm Schedule
+              </button>
+            </div>
+          </div>
+        )}
+
+        {c.status === 'scheduled' && (
+          <div className="flex flex-wrap items-center gap-3 w-full">
+            <div className="flex items-center gap-2 text-sm text-purple-700 bg-purple-50 px-4 py-2 rounded-lg border border-purple-200">
+              <CalendarClock className="w-4 h-4" />
+              Scheduled for <strong>{scheduledAtIST} IST</strong>
+            </div>
+            <ActionButton
+              label="Dispatch Now (early)"
+              icon={busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              color="bg-primary-600 hover:bg-primary-700 text-white"
+              disabled={busy}
+              onClick={() => onDispatch(c.id)}
+            />
+          </div>
         )}
 
         {c.status === 'running' && (
@@ -610,13 +714,14 @@ function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, on
       {/* Lifecycle guide */}
       <div className="mt-8 border-t border-gray-100 pt-6">
         <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Campaign Lifecycle</p>
-        <div className="flex items-center gap-1 text-xs text-gray-400">
-          {['Draft', 'Pending Approval', 'Approved', 'Sending', 'Completed'].map((step, i, arr) => (
+        <div className="flex items-center gap-1 text-xs text-gray-400 flex-wrap">
+          {['Draft', 'Pending Approval', 'Approved', 'Scheduled', 'Sending', 'Completed'].map((step, i, arr) => (
             <span key={step} className="flex items-center gap-1">
               <span className={`px-2 py-0.5 rounded ${
                 (c.status === 'draft' && step === 'Draft') ||
                 (c.status === 'pending_approval' && step === 'Pending Approval') ||
                 (c.status === 'approved' && step === 'Approved') ||
+                (c.status === 'scheduled' && step === 'Scheduled') ||
                 (c.status === 'running' && step === 'Sending') ||
                 (c.status === 'completed' && step === 'Completed')
                   ? 'bg-primary-100 text-primary-700 font-medium'

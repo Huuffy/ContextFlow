@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import re
 from app.events.queues import InboundEvent, inbound_queue
@@ -29,6 +30,29 @@ AUTO_REPLY_TEXT = (
     "To opt out of this service, reply with just: opt out\n"
     "— NeoBank Support Team"
 )
+
+TELEGRAM_WELCOME = (
+    "Hi! Welcome to NeoBank Support! How can we assist you today?"
+)
+
+TELEGRAM_FIRST_CONTACT_REPLY = (
+    "Thank you for reaching out to NeoBank Support! Our team has received your message "
+    "and will get back to you shortly.\n\n"
+    "In the meantime, please reply with your email address so we can link your "
+    "support history and assist you faster.\n\n"
+    "To opt out of this service, reply with just: opt out\n"
+    "— NeoBank Support Team"
+)
+
+TELEGRAM_FIRST_CONTACT_PAYMENT_REPLY = (
+    "Thank you for reaching out to NeoBank Support! Our team has received your message "
+    "and will get back to you shortly.\n\n"
+    "We noticed your query may relate to a payment or transaction. To help us pull up "
+    "your account details, please reply with your email address and NeoBank account number.\n\n"
+    "To opt out of this service, reply with just: opt out\n"
+    "— NeoBank Support Team"
+)
+
 
 PAYMENT_KEYWORDS = frozenset({
     "payment", "transaction", "transfer", "debit", "credit", "amount",
@@ -83,6 +107,12 @@ async def _process(event: InboundEvent) -> None:
                 await _handle_opt_out(event, customer_id, conversation_id, db)
                 return
 
+            # --- Telegram /start command ---
+            if event.channel == "telegram" and event.content.strip() == "/start":
+                await _handle_telegram_start(event, customer_id, db)
+                await db.commit()
+                return
+
             # --- Cross-channel email linking (Telegram / Instagram / WhatsApp) ---
             if event.channel in ("telegram", "instagram", "whatsapp"):
                 handled = await _handle_email_linking_flow(event, customer_id, conversation_id, db)
@@ -126,6 +156,17 @@ async def _process(event: InboundEvent) -> None:
                     )
                     if _conv:
                         _conv.status = ConversationStatus.awaiting_acc_no
+                elif event.channel == "telegram":
+                    if _has_payment_keywords(event.content):
+                        auto_reply_msg = await persist_system_message(
+                            TELEGRAM_FIRST_CONTACT_PAYMENT_REPLY, event.channel, conversation_id, db
+                        )
+                        if _conv:
+                            _conv.status = ConversationStatus.awaiting_acc_no
+                    else:
+                        auto_reply_msg = await persist_system_message(
+                            TELEGRAM_FIRST_CONTACT_REPLY, event.channel, conversation_id, db
+                        )
                 else:
                     auto_reply_msg = await persist_system_message(
                         AUTO_REPLY_TEXT, event.channel, conversation_id, db
@@ -291,6 +332,11 @@ async def _send_on_channel(channel: str, identifier: str, text: str) -> None:
         logger.error(f"Failed to send linking prompt on {channel} to {identifier}: {e}")
 
 
+async def _handle_telegram_start(event: InboundEvent, customer_id: str, db) -> None:
+    """Handle Telegram /start: just send a welcome greeting. Email/account prompt fires on first real question."""
+    await _send_on_channel("telegram", event.identifier, TELEGRAM_WELCOME)
+
+
 async def _handle_email_linking_flow(event: InboundEvent, customer_id: str,
                                       conversation_id: str, db) -> bool:
     """
@@ -307,7 +353,7 @@ async def _handle_email_linking_flow(event: InboundEvent, customer_id: str,
     content = event.content.strip()
     cache_key = f"{channel}:{identifier}"
 
-    # Case 1: waiting for email reply
+    # Case 1: waiting for email reply — only consume if message looks like an email
     if cache_key in _awaiting_email:
         if _EMAIL_RE.match(content.lower()):
             await _link_to_email(channel, identifier, customer_id, content.lower(), db)
@@ -315,19 +361,14 @@ async def _handle_email_linking_flow(event: InboundEvent, customer_id: str,
                 "Done! Your account is now linked. We can see your full support history.")
             del _awaiting_email[cache_key]
             return True
-        else:
-            await _send_on_channel(channel, identifier,
-                "That doesn't look like a valid email. Please reply with your email address.")
-            return True  # consume the bad attempt
+        # Not an email — let the message through as a normal query, keep waiting state
 
     # Case 2: new customer with no email — ask once
     result = await db.execute(select(Customer).where(Customer.id == customer_id))
     customer = result.scalar_one_or_none()
     if customer and not customer.email:
         _awaiting_email[cache_key] = customer_id
-        await _send_on_channel(channel, identifier,
-            "Hi! To link your account and see your full support history, "
-            "please reply with your email address.")
+        # Don't send a separate prompt here — the first-contact auto-reply includes the ask
         # Fall through — still persist the original first message
 
     return False
@@ -344,22 +385,48 @@ async def _link_to_email(channel: str, identifier: str, current_customer_id: str
     existing = result.scalar_one_or_none()
 
     if existing and existing.id != current_customer_id:
-        # Merge: reassign channel_identifier and all conversations to existing customer
+        # Reassign channel identifier to existing customer
         await db.execute(
             update(ChannelIdentifier)
             .where(ChannelIdentifier.channel == channel,
                    ChannelIdentifier.identifier == identifier)
             .values(customer_id=existing.id)
         )
-        result = await db.execute(
+
+        # Find the existing customer's most recent active conversation to merge into
+        from app.models import Message as MessageModel
+        target_result = await db.execute(
+            select(Conversation)
+            .where(Conversation.customer_id == existing.id)
+            .order_by(Conversation.last_message_at.desc())
+            .limit(1)
+        )
+        target_conv = target_result.scalar_one_or_none()
+
+        # Merge all conversations from the new (channel-only) customer into the target
+        src_result = await db.execute(
             select(Conversation).where(Conversation.customer_id == current_customer_id)
         )
-        for conv in result.scalars().all():
-            conv.customer_id = existing.id
+        for conv in src_result.scalars().all():
+            if target_conv:
+                # Move all messages into the target conversation
+                await db.execute(
+                    update(MessageModel)
+                    .where(MessageModel.conversation_id == conv.id)
+                    .values(conversation_id=target_conv.id)
+                )
+                # Add channel to target conversation's active channels
+                channels = json.loads(target_conv.active_channels_json or "[]")
+                if channel not in channels:
+                    channels.append(channel)
+                    target_conv.active_channels_json = json.dumps(channels)
+                await db.delete(conv)
+            else:
+                conv.customer_id = existing.id
 
         await db.execute(delete(Customer).where(Customer.id == current_customer_id))
         invalidate_cache(channel, identifier)
-        logger.info(f"Merged {channel}:{identifier} into existing customer {existing.id} ({email})")
+        logger.info(f"Merged {channel}:{identifier} into existing customer {existing.id} ({email}), target conv: {target_conv.id if target_conv else 'none'}")
     else:
         # No existing email customer — store email on current customer
         result = await db.execute(select(Customer).where(Customer.id == current_customer_id))

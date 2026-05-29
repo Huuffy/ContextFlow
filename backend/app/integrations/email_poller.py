@@ -105,10 +105,14 @@ async def _poll_once(queue: asyncio.Queue) -> None:
 
         message_id_header = msg.get("Message-ID", "").strip()
 
+        # For replies (Re:), just show the body; for new threads, prepend the subject
+        is_reply = subject.lower().startswith("re:")
+        content = body if is_reply else f"Subject: {subject}\n\n{body}"
+
         event = InboundEvent(
             channel="email",
             identifier=sender_email,
-            content=f"Subject: {subject}\n\n{body}",
+            content=content,
             external_id=message_id_header or uid_str,  # prefer real Message-ID for threading
             raw={
                 "sender_name": sender.split("<")[0].strip().strip('"'),
@@ -141,8 +145,29 @@ def _extract_body(msg) -> str:
         for part in msg.walk():
             if part.get_content_type() == "text/plain":
                 payload = part.get_payload(decode=True)
-                return payload.decode(part.get_content_charset() or "utf-8", errors="replace") if payload else ""
+                raw = payload.decode(part.get_content_charset() or "utf-8", errors="replace") if payload else ""
+                return _strip_quoted_reply(raw)
     else:
         payload = msg.get_payload(decode=True)
-        return payload.decode(msg.get_content_charset() or "utf-8", errors="replace") if payload else ""
+        raw = payload.decode(msg.get_content_charset() or "utf-8", errors="replace") if payload else ""
+        return _strip_quoted_reply(raw)
     return ""
+
+
+def _strip_quoted_reply(text: str) -> str:
+    """Remove quoted reply content — lines starting with '>' and 'On ... wrote:' blocks."""
+    import re
+    lines = text.splitlines()
+    cleaned = []
+    for line in lines:
+        # Stop at Gmail/Outlook "On <date> ... wrote:" separator
+        if re.match(r'^On .{10,} wrote:$', line.strip()):
+            break
+        # Stop at Outlook-style separator
+        if re.match(r'^-+\s*Original Message\s*-+$', line.strip(), re.IGNORECASE):
+            break
+        # Skip quoted lines
+        if line.startswith(">"):
+            continue
+        cleaned.append(line)
+    return "\n".join(cleaned).strip()

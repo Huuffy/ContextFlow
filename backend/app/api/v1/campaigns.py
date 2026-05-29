@@ -130,14 +130,31 @@ async def approve_campaign(campaign_id: str, body: ApproveRequest = ApproveReque
     return {"status": "approved"}
 
 
+class ScheduleRequest(BaseModel):
+    scheduled_at: datetime  # ISO with tz offset, e.g. 2026-05-30T14:30:00+05:30
+
+
+@router.post("/{campaign_id}/schedule")
+async def schedule_campaign(campaign_id: str, body: ScheduleRequest, db: AsyncSession = Depends(get_db)):
+    c = await _get_campaign(campaign_id, db)
+    if c.status != CampaignStatus.approved:
+        raise HTTPException(status_code=400, detail="Only approved campaigns can be scheduled")
+    c.status = CampaignStatus.scheduled
+    c.scheduled_at = body.scheduled_at
+    await db.commit()
+    from app.events.campaign_scheduler import log_event
+    log_event("scheduled", c.id, c.name, c.scheduled_at)
+    logger.info(f"Campaign {c.id} ({c.name}) scheduled for {c.scheduled_at.isoformat()}")
+    return {"status": "scheduled", "scheduled_at": c.scheduled_at.isoformat()}
+
+
 @router.post("/{campaign_id}/dispatch")
 async def dispatch_campaign(campaign_id: str, db: AsyncSession = Depends(get_db)):
     c = await _get_campaign(campaign_id, db)
-    if c.status != CampaignStatus.approved:
-        raise HTTPException(status_code=400, detail="Only approved campaigns can be dispatched")
+    if c.status not in (CampaignStatus.approved, CampaignStatus.scheduled):
+        raise HTTPException(status_code=400, detail="Only approved or scheduled campaigns can be dispatched")
     c.status = CampaignStatus.running
     await db.commit()
-    # Fire background send task
     asyncio.create_task(_run_dispatch(campaign_id))
     return {"status": "running"}
 
@@ -202,6 +219,7 @@ async def _run_dispatch(campaign_id: str) -> None:
 
                 name = (contact.get("name") or email.split("@")[0]).split()[0]
                 text = campaign.content_template.replace("{{name}}", name)
+                text += "\n\n─\nTo stop receiving messages from NeoBank, reply with just: opt out"
 
                 for channel in target_channels:
                     identifier: str | None = None
@@ -229,6 +247,9 @@ async def _run_dispatch(campaign_id: str) -> None:
             campaign.status = CampaignStatus.completed
             await db.commit()
             logger.info(f"Campaign {campaign_id} completed: {sent} sent, {delivered} delivered")
+            from app.events.campaign_scheduler import log_event
+            log_event("completed", campaign_id, campaign.name, campaign.scheduled_at,
+                      f"sent={sent} delivered={delivered}")
 
     except Exception as e:
         logger.error(f"Campaign dispatch error for {campaign_id}: {e}", exc_info=True)

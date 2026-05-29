@@ -92,7 +92,11 @@ async def _find_or_create_conversation(customer_id: str, channel: str, db: Async
     result = await db.execute(
         select(Conversation).where(
             Conversation.customer_id == customer_id,
-            Conversation.status.in_([ConversationStatus.open, ConversationStatus.waiting]),
+            Conversation.status.in_([
+                ConversationStatus.open,
+                ConversationStatus.waiting,
+                ConversationStatus.awaiting_acc_no,
+            ]),
         ).order_by(Conversation.last_message_at.desc())
     )
     conv = result.scalars().first()

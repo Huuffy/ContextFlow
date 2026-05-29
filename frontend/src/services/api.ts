@@ -78,6 +78,8 @@ export const campaignsApi = {
       `/campaigns/${id}/recipients`
     ).then((r) => r.data),
   dispatch: (id: string) => client.post(`/campaigns/${id}/dispatch`).then((r) => r.data),
+  schedule: (id: string, scheduledAt: string) =>
+    client.post(`/campaigns/${id}/schedule`, { scheduled_at: scheduledAt }).then((r) => r.data),
   cancel: (id: string) => client.delete(`/campaigns/${id}`).then((r) => r.data),
 }
 

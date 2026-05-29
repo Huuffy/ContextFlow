@@ -3,7 +3,7 @@ from app.config import settings
 
 router = APIRouter(prefix="/test", tags=["test"])
 
-TEST_EMAIL = "virajbhatia1611@gmail.com"
+TEST_EMAIL = "neobanksupport@gmail.com"
 
 
 @router.post("/send-email")

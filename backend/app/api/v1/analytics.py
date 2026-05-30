@@ -1,10 +1,11 @@
 import json
+import calendar
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, cast, Date
 from datetime import datetime, timezone, timedelta
 from app.db.session import get_db
-from app.models import Conversation, Message, AISummary, ConversationStatus, DNCEntry
+from app.models import Conversation, Message, AISummary, ConversationStatus, DNCEntry, Agent, Customer
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -72,16 +73,23 @@ async def dashboard(db: AsyncSession = Depends(get_db)):
     )).all()
     channel_breakdown = [{"channel": row[0], "count": row[1]} for row in channel_rows]
 
-    # Last 14 days volume (conversations created per day)
-    volume_by_day = []
-    for i in range(13, -1, -1):
-        day = (datetime.now(timezone.utc) - timedelta(days=i)).date()
+    # Last 12 months volume (conversations created per month)
+    now = datetime.now(timezone.utc)
+    volume_by_month = []
+    for i in range(11, -1, -1):
+        total_months = now.year * 12 + now.month - 1 - i
+        year = total_months // 12
+        month = total_months % 12 + 1
+        month_start = datetime(year, month, 1, tzinfo=timezone.utc)
+        last_day = calendar.monthrange(year, month)[1]
+        month_end = datetime(year, month, last_day, 23, 59, 59, tzinfo=timezone.utc)
         count = (await db.execute(
             select(func.count(Conversation.id)).where(
-                cast(Conversation.created_at, Date) == day
+                Conversation.created_at >= month_start,
+                Conversation.created_at <= month_end,
             )
         )).scalar() or 0
-        volume_by_day.append({"date": str(day)[5:], "count": count})
+        volume_by_month.append({"month": month_start.strftime("%b '%y"), "count": count})
 
     # Sentiment from AI summaries
     sentiment_rows = (await db.execute(
@@ -133,7 +141,7 @@ async def dashboard(db: AsyncSession = Depends(get_db)):
         "resolution_rate": resolution_rate,
         "avg_response_minutes": avg_response_minutes,
         "channel_breakdown": channel_breakdown,
-        "volume_by_day": volume_by_day,
+        "volume_by_month": volume_by_month,
         "sentiment_distribution": sentiment_distribution,
         "status_breakdown": status_breakdown,
         "top_issues": top_issues,
@@ -158,3 +166,53 @@ async def _calc_avg_response_minutes(db: AsyncSession) -> float:
             diff = (first_out - first_in).total_seconds() / 60
             deltas.append(diff)
     return round(sum(deltas) / len(deltas), 1) if deltas else 0.0
+
+
+@router.get("/agent-workload")
+async def agent_workload(db: AsyncSession = Depends(get_db)):
+    """Agent workload: assigned ticket counts + list of unassigned open/waiting tickets."""
+    active_statuses = [ConversationStatus.open, ConversationStatus.waiting]
+
+    # Per-agent ticket counts (open + waiting only)
+    agents = (await db.execute(select(Agent).where(Agent.is_active == True))).scalars().all()
+    agent_rows = []
+    for agent in agents:
+        count = (await db.execute(
+            select(func.count(Conversation.id)).where(
+                Conversation.assigned_agent_id == agent.id,
+                Conversation.status.in_(active_statuses),
+            )
+        )).scalar() or 0
+        agent_rows.append({
+            "id": agent.id,
+            "name": agent.full_name,
+            "email": agent.email,
+            "role": agent.role.value if hasattr(agent.role, "value") else str(agent.role),
+            "active_tickets": count,
+        })
+
+    # Unassigned open/waiting conversations
+    unassigned_convs = (await db.execute(
+        select(Conversation).where(
+            Conversation.assigned_agent_id == None,  # noqa: E711
+            Conversation.status.in_(active_statuses),
+        ).order_by(Conversation.created_at.asc())
+    )).scalars().all()
+
+    unassigned = []
+    for conv in unassigned_convs:
+        customer = (await db.execute(
+            select(Customer).where(Customer.id == conv.customer_id)
+        )).scalar_one_or_none()
+        unassigned.append({
+            "id": conv.id,
+            "topic": conv.topic,
+            "status": conv.status.value if hasattr(conv.status, "value") else str(conv.status),
+            "customer_name": customer.display_name if customer else "Unknown",
+            "created_at": conv.created_at.isoformat() if conv.created_at else None,
+        })
+
+    return {
+        "agents": sorted(agent_rows, key=lambda x: x["active_tickets"], reverse=True),
+        "unassigned": unassigned,
+    }

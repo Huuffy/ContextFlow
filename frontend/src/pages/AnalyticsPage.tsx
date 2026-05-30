@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { analytics } from '../services/api'
+import axios from 'axios'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts'
-import { MessageSquare, CheckCircle, Clock, AlertTriangle, TrendingUp, Inbox, Ban } from 'lucide-react'
+import { MessageSquare, CheckCircle, Clock, AlertTriangle, TrendingUp, Inbox, Ban, Users, UserX, FlaskConical } from 'lucide-react'
 
 const CHANNEL_COLORS: Record<string, string> = {
   whatsapp: '#22c55e',
@@ -43,7 +44,7 @@ interface DashData {
   resolution_rate: number
   avg_response_minutes: number
   channel_breakdown: { channel: string; count: number }[]
-  volume_by_day: { date: string; count: number }[]
+  volume_by_month: { month: string; count: number }[]
   sentiment_distribution: { sentiment: string; count: number }[]
   status_breakdown: { status: string; count: number; color: string }[]
   top_issues: { issue: string; count: number }[]
@@ -96,10 +97,22 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null
 }
 
+interface AgentRow { id: string; name: string; email: string; role: string; active_tickets: number }
+interface UnassignedRow { id: string; topic: string; status: string; customer_name: string; created_at: string }
+interface WorkloadData { agents: AgentRow[]; unassigned: UnassignedRow[] }
+
 export default function AnalyticsPage() {
   const [data, setData] = useState<DashData | null>(null)
+  const [workload, setWorkload] = useState<WorkloadData | null>(null)
 
-  useEffect(() => { analytics.dashboard().then(setData) }, [])
+  useEffect(() => {
+    analytics.dashboard().then(setData)
+    const base = import.meta.env.VITE_API_URL ?? '/api/v1'
+    const token = localStorage.getItem('token')
+    axios.get(`${base}/analytics/agent-workload`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).then(r => setWorkload(r.data)).catch(() => {})
+  }, [])
 
   if (!data) return <div className="h-full flex items-center justify-center text-gray-400 text-sm">Loading…</div>
 
@@ -139,14 +152,14 @@ export default function AnalyticsPage() {
         {/* Charts row 1 */}
         <div className="grid grid-cols-2 gap-4">
 
-          {/* Volume chart — 14 days */}
+          {/* Volume chart — 12 months */}
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-sm font-medium text-gray-700 mb-1">Conversation Volume</p>
-            <p className="text-xs text-gray-400 mb-4">New tickets per day — last 14 days</p>
+            <p className="text-xs text-gray-400 mb-4">New tickets per month — last 12 months</p>
             <ResponsiveContainer width="100%" height={190}>
-              <BarChart data={data.volume_by_day} barSize={14}>
+              <BarChart data={data.volume_by_month} barSize={18}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={1} />
+                <XAxis dataKey="month" tick={{ fontSize: 9 }} interval={0} angle={-35} textAnchor="end" height={40} />
                 <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="count" name="tickets" fill="#0d9488" radius={[3, 3, 0, 0]} />
@@ -245,6 +258,80 @@ export default function AnalyticsPage() {
             </div>
           </div>
         </div>
+
+        {/* ── DEMO: Agent Workload ──────────────────────────────────────────── */}
+        {workload && (
+          <div className="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/60 p-5">
+            {/* Demo header */}
+            <div className="flex items-center gap-2 mb-1">
+              <FlaskConical className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <p className="text-sm font-semibold text-amber-700">Agent Workload</p>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-700 uppercase tracking-wide">Demo</span>
+            </div>
+            <p className="text-xs text-amber-600 mb-4">Prototype view — full assignment management to be implemented. Shows who is working on what and highlights unassigned tickets for admin action.</p>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Agent table */}
+              <div className="bg-white rounded-lg border border-amber-200 overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-amber-100 bg-amber-50">
+                  <Users className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="text-xs font-semibold text-amber-700">Support Team — Active Tickets</span>
+                </div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left px-4 py-2 text-gray-500 font-medium">Agent</th>
+                      <th className="text-left px-4 py-2 text-gray-500 font-medium">Email</th>
+                      <th className="text-right px-4 py-2 text-gray-500 font-medium">Open</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {workload.agents.filter(a => a.role !== 'admin').map(agent => (
+                      <tr key={agent.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-medium text-gray-800">{agent.name}</td>
+                        <td className="px-4 py-2.5 text-gray-500">{agent.email}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                            agent.active_tickets === 0 ? 'bg-gray-100 text-gray-400'
+                            : agent.active_tickets >= 3 ? 'bg-red-100 text-red-600'
+                            : 'bg-teal-100 text-teal-700'
+                          }`}>
+                            {agent.active_tickets}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Unassigned tickets */}
+              <div className="bg-white rounded-lg border border-red-200 overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-red-100 bg-red-50">
+                  <UserX className="w-3.5 h-3.5 text-red-500" />
+                  <span className="text-xs font-semibold text-red-600">Unassigned Tickets</span>
+                  <span className="ml-auto px-1.5 py-0.5 rounded bg-red-100 text-red-600 text-[10px] font-bold">{workload.unassigned.length}</span>
+                </div>
+                {workload.unassigned.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-xs text-gray-400">All tickets are assigned</p>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {workload.unassigned.map(conv => (
+                      <div key={conv.id} className="px-4 py-3">
+                        <p className="font-medium text-gray-800 text-xs truncate">{conv.customer_name}</p>
+                        <p className="text-gray-500 text-[11px] truncate mt-0.5">{conv.topic}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-teal-50 text-teal-600 border border-teal-100 capitalize">{conv.status}</span>
+                          <span className="text-[10px] text-gray-400">{conv.created_at ? new Date(conv.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Top complaint categories */}
         {data.top_issues.length > 0 && (

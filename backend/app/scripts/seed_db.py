@@ -367,8 +367,36 @@ async def seed():
             role=AgentRole.agent,
             is_active=True,
         )
-        db.add(agent_admin)
-        db.add(agent_support)
+        agent_manish = Agent(
+            email="manish@neobanksupport.com",
+            password_hash=hash_password("agent123"),
+            full_name="Manish Sharma",
+            role=AgentRole.agent,
+            is_active=True,
+        )
+        agent_priya = Agent(
+            email="priya@neobanksupport.com",
+            password_hash=hash_password("agent123"),
+            full_name="Priya Patel",
+            role=AgentRole.agent,
+            is_active=True,
+        )
+        agent_rahul = Agent(
+            email="rahul@neobanksupport.com",
+            password_hash=hash_password("agent123"),
+            full_name="Rahul Singh",
+            role=AgentRole.agent,
+            is_active=True,
+        )
+        agent_ananya = Agent(
+            email="ananya@neobanksupport.com",
+            password_hash=hash_password("agent123"),
+            full_name="Ananya Kumar",
+            role=AgentRole.agent,
+            is_active=True,
+        )
+        for a in [agent_admin, agent_support, agent_manish, agent_priya, agent_rahul, agent_ananya]:
+            db.add(a)
         await db.flush()
 
         print("Seeding customers...")
@@ -422,17 +450,31 @@ async def seed():
             ), {"cid": cust.id})
 
         print("Seeding conversations...")
-        for conv_def in CONVERSATIONS:
+        # Spread 15 conversations across last 6 months for a realistic monthly volume chart
+        _CONV_DAY_OFFSETS = [152, 144, 121, 113, 91, 84, 78, 61, 54, 48, 31, 24, 18, 5, 2]
+
+        # Agent assignment per conversation index. None = unassigned (3 tickets: indices 3, 8, 12)
+        _CONV_AGENTS = [
+            agent_manish, agent_priya, agent_rahul, None,
+            agent_support, agent_manish, agent_ananya, agent_rahul, None,
+            agent_priya, agent_manish, agent_support, None,
+            agent_ananya, agent_rahul,
+        ]
+
+        for i, conv_def in enumerate(CONVERSATIONS):
             customer = customer_map[conv_def["customer"]]
             channels = conv_def["channels"]
+            conv_created_at = NOW - timedelta(days=_CONV_DAY_OFFSETS[i])
+            assigned = _CONV_AGENTS[i]
 
             conv = Conversation(
                 customer_id=customer.id,
-                assigned_agent_id=agent_support.id,
+                assigned_agent_id=assigned.id if assigned else None,
                 status=conv_def["status"],
                 active_channels_json=json.dumps(channels),
                 topic=conv_def["topic"],
-                last_message_at=conv_def["messages"][-1][3],  # timestamp of last message
+                last_message_at=conv_def["messages"][-1][3],
+                created_at=conv_created_at,
             )
             db.add(conv)
             await db.flush()

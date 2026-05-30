@@ -110,11 +110,13 @@ const features = [
   },
 ]
 
+const TELEGRAM_BOT_URL = 'https://t.me/ContextFlow_support_bot'
+
 const channels = [
-  { icon: <Phone className="w-4 h-4" />, label: 'WhatsApp', color: 'bg-green-500/20 text-green-300 border-green-500/30' },
-  { icon: <AtSign className="w-4 h-4" />, label: 'Instagram', color: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
-  { icon: <Mail className="w-4 h-4" />, label: 'Email', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
-  { icon: <Send className="w-4 h-4" />, label: 'Telegram', color: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
+  { icon: <Phone className="w-4 h-4" />, label: 'WhatsApp', color: 'bg-green-500/20 text-green-300 border-green-500/30', href: null },
+  { icon: <AtSign className="w-4 h-4" />, label: 'Instagram', color: 'bg-pink-500/20 text-pink-300 border-pink-500/30', href: null },
+  { icon: <Mail className="w-4 h-4" />, label: 'Email', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30', href: 'mailto:neobanksupport@gmail.com' },
+  { icon: <Send className="w-4 h-4" />, label: 'Telegram', color: 'bg-sky-500/20 text-sky-300 border-sky-500/30', href: TELEGRAM_BOT_URL },
 ]
 
 const pages = [
@@ -252,6 +254,32 @@ export default function HomePage() {
           </motion.button>
         </motion.div>
 
+        {/* Telegram CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.75 }}
+          className="mt-5"
+        >
+          <motion.a
+            href={TELEGRAM_BOT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.97 }}
+            className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl text-sm font-semibold transition-all"
+            style={{
+              background: 'linear-gradient(135deg, rgba(14,165,233,0.15) 0%, rgba(56,189,248,0.08) 100%)',
+              border: '1.5px solid rgba(56,189,248,0.4)',
+              color: '#7dd3fc',
+              boxShadow: '0 0 0 1px rgba(56,189,248,0.08) inset',
+            }}
+          >
+            <Send className="w-4 h-4" />
+            Message us on Telegram
+          </motion.a>
+        </motion.div>
+
         {/* Channel pills */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -259,14 +287,26 @@ export default function HomePage() {
           transition={{ delay: 0.9 }}
           className="mt-10 flex flex-wrap items-center justify-center gap-3"
         >
-          {channels.map((ch) => (
-            <span
-              key={ch.label}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${ch.color}`}
-            >
-              {ch.icon} {ch.label}
-            </span>
-          ))}
+          {channels.map((ch) =>
+            ch.href ? (
+              <a
+                key={ch.label}
+                href={ch.href}
+                target={ch.href.startsWith('http') ? '_blank' : undefined}
+                rel="noopener noreferrer"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-opacity hover:opacity-80 ${ch.color}`}
+              >
+                {ch.icon} {ch.label}
+              </a>
+            ) : (
+              <span
+                key={ch.label}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${ch.color}`}
+              >
+                {ch.icon} {ch.label}
+              </span>
+            )
+          )}
           <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-white/20 text-white/50">
             + more channels
           </span>
@@ -365,6 +405,16 @@ export default function HomePage() {
               className="text-teal-400 hover:text-teal-300 transition-colors font-medium"
             >
               neobanksupport@gmail.com
+            </a>
+            <span className="hidden md:block text-teal-600">•</span>
+            <a
+              href={TELEGRAM_BOT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-sky-400 hover:text-sky-300 transition-colors font-medium"
+            >
+              <Send className="w-3.5 h-3.5" />
+              @ContextFlow_support_bot
             </a>
           </div>
 

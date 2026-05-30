@@ -26,7 +26,7 @@ export default function DashboardLayout() {
         <div className="h-14 flex items-center justify-between px-3 border-b border-white/10 flex-shrink-0">
           {/* Logo — click goes home */}
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="flex items-center gap-2 min-w-0 group"
             title="Go to home"
           >
@@ -76,7 +76,7 @@ export default function DashboardLayout() {
         {/* Footer */}
         <div className="px-2 pb-3 border-t border-white/10 pt-2 flex-shrink-0">
           <NavLink
-            to="/"
+            to="/home"
             title={!open ? 'Home' : undefined}
             className="flex items-center gap-3 px-2 py-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors text-xs"
           >

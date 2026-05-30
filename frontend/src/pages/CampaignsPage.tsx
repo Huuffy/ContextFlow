@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Send, CheckCircle, Clock, AlertCircle, Megaphone, Trash2, ChevronRight, Loader2, Mail, Phone, MessageSquare, Monitor, Search, ShieldOff, Users, UserPlus, CalendarClock, X } from 'lucide-react'
+import { Plus, Send, CheckCircle, AlertCircle, Megaphone, Trash2, ChevronRight, Loader2, Mail, Phone, MessageSquare, Monitor, Search, ShieldOff, Users, UserPlus, CalendarClock, X } from 'lucide-react'
 import { campaignsApi } from '../services/api'
 import type { Campaign } from '../types'
 import { RegisterModalWrapper } from '../components/RegisterModal'
@@ -504,7 +504,7 @@ function RecipientPicker({ campaignId, busy, onApprove }: {
   )
 }
 
-function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, onSchedule, onCancel }: {
+function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, onSchedule, onCancel: _onCancel }: {
   campaign: Campaign
   busy: boolean
   onSubmit: (id: string) => void
@@ -517,7 +517,6 @@ function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, on
   const [scheduleInput, setScheduleInput] = useState('')
 
   const st = STATUS[c.status as keyof typeof STATUS] ?? STATUS.draft
-  const canCancel = ['draft', 'pending_approval', 'approved', 'scheduled'].includes(c.status)
 
   // Build default value for datetime-local: now + 1 hour in local time
   const defaultScheduleValue = () => {

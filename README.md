@@ -41,7 +41,7 @@ ContextFlow solves this with a single AI-powered agent inbox that accepts inboun
 
 ## Live Demo
 
-🔗 **Live Demo:** [https://contextflow.cloudcompute.live](https://contextflow.cloudcompute.live) 
+🔗 **Live Demo:** [https://context--flow.web.app](https://context--flow.web.app)
 🎥 **Demo Video:** *(coming soon)*
 
 ---

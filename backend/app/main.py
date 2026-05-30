@@ -92,9 +92,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ContextFlow API", version="0.1.0", lifespan=lifespan, redirect_slashes=False)
 
+_raw_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:3000,"
+    "https://contextflow.web.app,https://contextflow.firebaseapp.com"
+)
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -150,3 +156,22 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: str):
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "contextflow-backend"}
+
+
+# ─── Serve React SPA (production / Cloud Run) ─────────────────────────────────
+# Must be registered AFTER all API routes so the catch-all never intercepts /api/* or /ws/*
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend_dist"
+# /app/backend/app/main.py → 3 parents up → /app/  → /app/frontend_dist
+
+if _FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="frontend-assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        return FileResponse(str(_FRONTEND_DIST / "index.html"))
+
+    logger.info(f"Serving frontend from {_FRONTEND_DIST}")

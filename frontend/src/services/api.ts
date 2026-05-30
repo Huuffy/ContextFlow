@@ -1,7 +1,9 @@
 import axios from 'axios'
 import type { Conversation, Message, Customer, Transaction, AISummary, Campaign, DNCEntry, AccountTransaction } from '../types'
 
-const client = axios.create({ baseURL: '/api/v1' })
+// Dev: relative URL (Vite proxy forwards to localhost:8000)
+// Prod: VITE_API_URL = https://contextflow-187456696352.asia-south1.run.app/api/v1
+const client = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? '/api/v1' })
 
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
@@ -112,9 +114,13 @@ export const register = (data: {
   telegram?: string
 }) => client.post('/register', data).then((r) => r.data)
 
+const _webhookBase = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace('/api/v1', '')
+  : ''
+
 export const simulator = {
   send: (channel: string, identifier: string, content: string) =>
-    axios.post(`/api/webhooks/simulator/${channel}`, { identifier, content }).then((r) => r.data),
+    axios.post(`${_webhookBase}/api/webhooks/simulator/${channel}`, { identifier, content }).then((r) => r.data),
 }
 
 export default client

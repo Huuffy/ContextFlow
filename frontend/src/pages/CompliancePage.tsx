@@ -33,7 +33,6 @@ export default function CompliancePage() {
   }
 
   const emailEntries = dncList.filter((d) => d.identifier_type === 'email')
-  const otherEntries = dncList.filter((d) => d.identifier_type !== 'email')
 
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">

@@ -1,0 +1,38 @@
+.git
+.gitignore
+
+# Local secrets — must never be in the image
+backend/.env
+backend/.env.local
+
+# Python build artifacts
+backend/.venv
+backend/__pycache__
+backend/**/__pycache__
+backend/*.egg-info
+**/__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+
+# Local runtime data (re-created by seed_db.py on container start)
+backend/data/
+
+# Frontend build artifacts and local modules
+frontend/node_modules
+frontend/.pnpm-store
+frontend/dist
+
+# Windows launcher scripts
+_run_backend.bat
+_run_frontend.bat
+run.py
+
+# Docs / resources not needed at runtime
+Resources/
+*.md
+*.docx
+
+# IDE
+.vscode
+.idea

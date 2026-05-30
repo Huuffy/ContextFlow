@@ -15,7 +15,11 @@ export function useWebSocket(agentId: string | null) {
     const connect = () => {
       if (destroyedRef.current) return
 
-      const ws = new WebSocket(`ws://localhost:8000/ws/agent/${agentId}`)
+      // Dev: window.location.host = localhost:5173, Vite proxy forwards /ws/* to localhost:8000
+      // Prod: VITE_WS_URL = wss://contextflow-XXXX-el.a.run.app (Cloud Run direct, Firebase can't proxy WS)
+      const wsBase = import.meta.env.VITE_WS_URL
+        ?? ((window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host)
+      const ws = new WebSocket(`${wsBase}/ws/agent/${agentId}`)
       wsRef.current = ws
 
       ws.onmessage = (e) => {

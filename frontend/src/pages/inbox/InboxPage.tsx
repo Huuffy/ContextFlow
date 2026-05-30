@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Mail, X, CreditCard, Landmark, Wallet, Banknote, ArrowUpRight, ArrowDownLeft, ExternalLink, Copy, Check } from 'lucide-react'
+import { Mail, X, CreditCard, Landmark, Wallet, Banknote, ArrowUpRight, ArrowDownLeft, Copy, Check } from 'lucide-react'
 import { useConversationStore } from '../../stores/conversationStore'
 import { conversations as convApi } from '../../services/api'
 import type { Conversation } from '../../types'

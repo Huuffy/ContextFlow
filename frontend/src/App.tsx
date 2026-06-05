@@ -6,9 +6,11 @@ import InboxPage from './pages/inbox/InboxPage'
 import CampaignsPage from './pages/CampaignsPage'
 import CompliancePage from './pages/CompliancePage'
 import AnalyticsPage from './pages/AnalyticsPage'
+import BackendGate from './components/BackendGate'
 
 export default function App() {
   return (
+    <BackendGate>
     <BrowserRouter>
       <Routes>
         {/* Root → landing */}
@@ -28,5 +30,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </BrowserRouter>
+    </BackendGate>
   )
 }

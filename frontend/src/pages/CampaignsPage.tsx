@@ -518,10 +518,11 @@ function CampaignDetail({ campaign: c, busy, onSubmit, onApprove, onDispatch, on
 
   const st = STATUS[c.status as keyof typeof STATUS] ?? STATUS.draft
 
-  // Build default value for datetime-local: now + 1 hour in local time
+  // Build default value for datetime-local: now + 1 hour in LOCAL time (IST on user's machine)
   const defaultScheduleValue = () => {
     const d = new Date(Date.now() + 60 * 60 * 1000)
-    return d.toISOString().slice(0, 16)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
   }
 
   const handleOpenScheduler = () => {

@@ -21,7 +21,7 @@ def log_event(event: str, campaign_id: str, campaign_name: str,
         "event": event,
         "id": campaign_id,
         "name": campaign_name,
-        "scheduled_at": scheduled_at.astimezone(IST).strftime("%Y-%m-%d %H:%M:%S") if scheduled_at else None,
+        "scheduled_at": _as_utc(scheduled_at).astimezone(IST).strftime("%Y-%m-%d %H:%M:%S") if scheduled_at else None,
         "note": note,
     }
     with _LOG_PATH.open("a", encoding="utf-8") as f:
@@ -42,6 +42,13 @@ async def run_campaign_scheduler() -> None:
         await asyncio.sleep(60)
 
 
+def _as_utc(dt: datetime) -> datetime:
+    """Ensure a datetime is UTC-aware — SQLite may return naive datetimes."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 async def _check_and_dispatch() -> None:
     from app.db.session import AsyncSessionLocal
     from app.models import Campaign, CampaignStatus
@@ -51,23 +58,20 @@ async def _check_and_dispatch() -> None:
     now_utc = datetime.now(timezone.utc)
 
     async with AsyncSessionLocal() as db:
+        # Fetch all scheduled campaigns — filter in Python to avoid naive/aware mismatch in SQLite
         result = await db.execute(
-            select(Campaign).where(
-                Campaign.status == CampaignStatus.scheduled,
-                Campaign.scheduled_at <= now_utc,
-            )
+            select(Campaign).where(Campaign.status == CampaignStatus.scheduled)
         )
-        due = result.scalars().all()
+        all_scheduled = result.scalars().all()
+        due = [c for c in all_scheduled if c.scheduled_at and _as_utc(c.scheduled_at) <= now_utc]
 
         if due:
             logger.info(f"Campaign scheduler: {len(due)} campaign(s) due to fire")
 
         for campaign in due:
-            ist_time = (
-                campaign.scheduled_at.astimezone(IST).strftime("%Y-%m-%d %H:%M IST")
-                if campaign.scheduled_at else "—"
-            )
-            delay_s = int((now_utc - campaign.scheduled_at).total_seconds()) if campaign.scheduled_at else 0
+            scheduled_utc = _as_utc(campaign.scheduled_at)
+            ist_time = scheduled_utc.astimezone(IST).strftime("%Y-%m-%d %H:%M IST")
+            delay_s = int((now_utc - scheduled_utc).total_seconds())
             logger.info(f"Firing campaign {campaign.id} ({campaign.name}) — due at {ist_time}, {delay_s}s late")
 
             campaign.status = CampaignStatus.running

@@ -140,7 +140,10 @@ async def schedule_campaign(campaign_id: str, body: ScheduleRequest, db: AsyncSe
     if c.status != CampaignStatus.approved:
         raise HTTPException(status_code=400, detail="Only approved campaigns can be scheduled")
     c.status = CampaignStatus.scheduled
-    c.scheduled_at = body.scheduled_at
+    # Always store as UTC-aware so scheduler comparisons work regardless of server timezone
+    from datetime import timezone as _tz
+    scheduled_utc = body.scheduled_at.astimezone(_tz.utc)
+    c.scheduled_at = scheduled_utc
     await db.commit()
     from app.events.campaign_scheduler import log_event
     log_event("scheduled", c.id, c.name, c.scheduled_at)
@@ -240,7 +243,12 @@ async def _run_dispatch(campaign_id: str) -> None:
                     if ok:
                         delivered += 1
 
-                    await asyncio.sleep(0.05)  # avoid rate-limit bursts
+                    # Gmail free SMTP: 100/day hard cap, safe burst ~1/sec.
+                    # 1s delay keeps us well under the velocity trigger without being slow.
+                    if channel == "email":
+                        await asyncio.sleep(1)
+                    else:
+                        await asyncio.sleep(0.05)
 
             campaign.sent_count = sent
             campaign.delivered_count = delivered
@@ -252,13 +260,19 @@ async def _run_dispatch(campaign_id: str) -> None:
                       f"sent={sent} delivered={delivered}")
 
     except Exception as e:
-        logger.error(f"Campaign dispatch error for {campaign_id}: {e}", exc_info=True)
+        from app.integrations.email_client import EmailRateLimitError
+        is_quota = isinstance(e, EmailRateLimitError)
+        if is_quota:
+            logger.warning(f"Campaign {campaign_id} paused — Gmail daily quota exhausted: {e}")
+        else:
+            logger.error(f"Campaign dispatch error for {campaign_id}: {e}", exc_info=True)
         try:
             from app.db.session import AsyncSessionLocal as _ASL
             async with _ASL() as db:
                 result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
                 c = result.scalar_one_or_none()
                 if c and c.status == CampaignStatus.running:
+                    # Quota exhaustion → completed (partial); other errors → completed with warning
                     c.status = CampaignStatus.completed
                     await db.commit()
         except Exception:
@@ -269,12 +283,16 @@ async def _send_campaign_message(channel: str, identifier: str, text: str,
                                   campaign_name: str, customer_email: str | None) -> bool:
     try:
         if channel == "email":
-            from app.integrations.email_client import send_email
-            await send_email(
-                to=identifier,
-                subject=f"NeoBank: {campaign_name}",
-                body=text,
-            )
+            from app.integrations.email_client import send_email, EmailRateLimitError
+            try:
+                await send_email(
+                    to=identifier,
+                    subject=f"NeoBank: {campaign_name}",
+                    body=text,
+                )
+            except EmailRateLimitError:
+                # Re-raise so _run_dispatch can stop the campaign and mark it for retry
+                raise
         elif channel == "telegram":
             from app.integrations.telegram_client import send_telegram_message
             await send_telegram_message(chat_id=identifier, text=text)

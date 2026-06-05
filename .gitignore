@@ -54,3 +54,4 @@ _run_*.bat
 *.tmp
 
 vite.build.cache.yaml
+.firebase/

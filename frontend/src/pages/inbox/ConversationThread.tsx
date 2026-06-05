@@ -63,6 +63,8 @@ export default function ConversationThread({ conversation, onClose }: Props) {
     if (!conversation) return
     try {
       await convApi.close(conversation.id)
+      // Brief pause so the auto-reply from the server appears in the thread
+      await new Promise((res) => setTimeout(res, 1500))
       onClose?.(conversation.id)
     } catch (e) {
       console.error(e)

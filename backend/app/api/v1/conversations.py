@@ -3,10 +3,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from app.db.session import get_db
-from app.models import Conversation, Message, Customer, AISummary, ConversationStatus
+from app.models import (
+    Conversation, Message, Customer, AISummary, ConversationStatus,
+    ChannelIdentifier, MessageDirection,
+)
+from app.services.message_service import persist_system_message
+from app.events.queues import outbound_queue, OutboundEvent
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+
+CLOSE_AUTO_REPLY = (
+    "Thank you for contacting NeoBank Support! We hope you had a great experience. "
+    "Your ticket has been closed. Feel free to reach out anytime — we're always here to help!"
+)
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -139,6 +149,81 @@ async def close_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
     conv = result.scalar_one_or_none()
     if not conv:
         raise HTTPException(status_code=404, detail="Not found")
+
+    # Send auto-reply to customer on their active channel before closing
+    active_channels = json.loads(conv.active_channels_json or "[]")
+    reply_channel = active_channels[0] if active_channels else None
+
+    if reply_channel:
+        ci_result = await db.execute(
+            select(ChannelIdentifier).where(
+                ChannelIdentifier.customer_id == conv.customer_id,
+                ChannelIdentifier.channel == reply_channel,
+            )
+        )
+        ci = ci_result.scalar_one_or_none()
+        if not ci:
+            # Fall back to any available identifier
+            ci_result = await db.execute(
+                select(ChannelIdentifier).where(ChannelIdentifier.customer_id == conv.customer_id)
+            )
+            ci = ci_result.scalars().first()
+            if ci:
+                reply_channel = ci.channel
+
+        if ci:
+            msg = await persist_system_message(
+                content=CLOSE_AUTO_REPLY,
+                channel=reply_channel,
+                conversation_id=conv_id,
+                db=db,
+            )
+
+            # Build email threading headers so the reply lands in the same Gmail thread
+            email_subject = in_reply_to = references = None
+            if reply_channel == "email":
+                raw_subject = conv.topic or "NeoBank Support"
+                email_subject = raw_subject if raw_subject.lower().startswith("re:") else f"Re: {raw_subject}"
+                all_inbound = await db.execute(
+                    select(Message)
+                    .where(
+                        Message.conversation_id == conv_id,
+                        Message.channel == "email",
+                        Message.direction == MessageDirection.inbound,
+                    )
+                    .order_by(Message.created_at.asc())
+                )
+                inbound_msgs = all_inbound.scalars().all()
+                msg_ids = [m.external_id for m in inbound_msgs if m.external_id and "@" in m.external_id]
+                if msg_ids:
+                    in_reply_to = msg_ids[-1]
+                    references = " ".join(msg_ids)
+
+            await outbound_queue.put(OutboundEvent(
+                channel=reply_channel,
+                identifier=ci.identifier,
+                content=CLOSE_AUTO_REPLY,
+                message_id=msg.id,
+                subject=email_subject,
+                in_reply_to=in_reply_to,
+                references=references,
+            ))
+
+            # Push auto-reply to the agent dashboard in real time
+            from app.core.websocket import ws_manager
+            await ws_manager.broadcast({
+                "type": "message_new",
+                "data": {
+                    "message_id": msg.id,
+                    "conversation_id": conv_id,
+                    "customer_id": conv.customer_id,
+                    "channel": reply_channel,
+                    "content": CLOSE_AUTO_REPLY,
+                    "sender_type": "system",
+                    "direction": "outbound",
+                },
+            })
+
     conv.status = ConversationStatus.closed
     await db.commit()
     return {"status": "closed"}

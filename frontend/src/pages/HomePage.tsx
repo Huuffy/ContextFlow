@@ -131,7 +131,7 @@ export default function HomePage() {
   const [showRegister, setShowRegister] = useState(false)
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-[#021b1a] via-[#042f2e] to-[#063330] overflow-hidden text-white">
+    <div className="relative min-h-screen bg-gradient-to-br from-[#021b1a] via-[#042f2e] to-[#063330] overflow-x-hidden text-white">
       <RegisterModalWrapper show={showRegister} onClose={() => setShowRegister(false)} />
       <StarField />
       <FloatingOrbs />
@@ -362,7 +362,7 @@ export default function HomePage() {
           viewport={{ once: true }}
           className="p-8 rounded-3xl border border-teal-500/20 bg-teal-500/5 backdrop-blur-sm text-center"
         >
-          <h3 className="text-xl font-bold mb-2">5 Powerful Modules</h3>
+          <h3 className="text-xl font-bold mb-2">4 Powerful Modules</h3>
           <p className="text-teal-100/60 text-sm mb-6">Everything you need in one dashboard</p>
           <div className="flex flex-wrap justify-center gap-3">
             {pages.map((p, i) => (

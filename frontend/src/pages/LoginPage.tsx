@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { MessageSquare, Lock, Mail, Zap } from 'lucide-react'
+import { Lock, Mail, MessageSquare, Zap } from 'lucide-react'
 import { auth } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
 
@@ -32,7 +32,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 flex items-center justify-center p-4">
       {/* Background pattern */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
         {[...Array(6)].map((_, i) => (
           <motion.div
             key={i}
@@ -57,17 +57,16 @@ export default function LoginPage() {
       >
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           {/* Logo */}
-          <div className="text-center mb-8">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
+          <div className="flex justify-center mb-8">
+            <motion.img
+              src="/logo.png"
+              alt="ContextFlow"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
-              className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 mb-4 shadow-lg"
-            >
-              <MessageSquare className="w-8 h-8 text-white" />
-            </motion.div>
-            <h1 className="text-2xl font-bold text-gray-900">ContextFlow</h1>
-            <p className="text-sm text-gray-500 mt-1">NeoBank Support Platform</p>
+              className="h-16 w-auto object-contain rounded-xl"
+              style={{ filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.8))' }}
+            />
           </div>
 
           {/* Stats row */}
@@ -92,23 +91,26 @@ export default function LoginPage() {
 
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
                 <input
+                  id="login-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                  aria-describedby={error ? 'login-error' : undefined}
                   required
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden="true" />
                 <input
+                  id="login-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -119,9 +121,11 @@ export default function LoginPage() {
             </div>
             {error && (
               <motion.p
+                id="login-error"
+                role="alert"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2"
+                className="text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2"
               >
                 {error}
               </motion.p>
@@ -134,8 +138,8 @@ export default function LoginPage() {
               className="w-full py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold rounded-lg transition-all shadow-sm disabled:opacity-50"
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <span className="flex items-center justify-center gap-2" role="status" aria-label="Signing in">
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>

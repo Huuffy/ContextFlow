@@ -3,6 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_db
 from app.models.bank_account import BankAccount, AccountTransaction
+from app.models import Agent
+from app.core.security import get_current_agent
 from pydantic import BaseModel
 from datetime import date
 

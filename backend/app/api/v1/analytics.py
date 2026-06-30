@@ -6,6 +6,7 @@ from sqlalchemy import select, func, cast, Date
 from datetime import datetime, timezone, timedelta
 from app.db.session import get_db
 from app.models import Conversation, Message, AISummary, ConversationStatus, DNCEntry, Agent, Customer
+from app.core.security import get_current_agent
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 

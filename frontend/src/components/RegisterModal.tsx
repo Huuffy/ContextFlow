@@ -3,16 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { UserPlus, X, CheckCircle, Loader2, Mail, Phone, Send, Users } from 'lucide-react'
 import { register } from '../services/api'
 
-function Field({ label, placeholder, value, onChange, icon, type = 'text' }: {
-  label: string; placeholder: string; value: string
+function Field({ id, label, placeholder, value, onChange, icon, type = 'text' }: {
+  id: string; label: string; placeholder: string; value: string
   onChange: (v: string) => void; icon: React.ReactNode; type?: string
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-teal-300/70 mb-1.5">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-teal-300/70 mb-1.5">{label}</label>
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-teal-500/60">{icon}</span>
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-teal-500/60" aria-hidden="true">{icon}</span>
         <input
+          id={id}
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -56,25 +57,29 @@ export function RegisterModal({ onClose }: { onClose: () => void }) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="register-modal-title"
         initial={{ opacity: 0, scale: 0.92, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.92, y: 20 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
         className="w-full max-w-md rounded-3xl border border-teal-500/30 bg-[#0a2928] shadow-2xl shadow-teal-900/50 p-8"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
       >
         <div className="flex items-start justify-between mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-teal-500/20 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-teal-500/20 flex items-center justify-center" aria-hidden="true">
                 <UserPlus className="w-4 h-4 text-teal-400" />
               </div>
-              <h2 className="text-lg font-bold text-white">Stay Connected</h2>
+              <h2 id="register-modal-title" className="text-lg font-bold text-white">Stay Connected</h2>
             </div>
             <p className="text-sm text-teal-200/60">Register to receive NeoBank campaign messages</p>
           </div>
-          <button onClick={onClose} className="text-teal-400/60 hover:text-teal-300 transition-colors">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} aria-label="Close registration form" className="text-teal-400/60 hover:text-teal-300 transition-colors">
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -98,20 +103,20 @@ export function RegisterModal({ onClose }: { onClose: () => void }) {
           </motion.div>
         ) : (
           <div className="space-y-4">
-            <Field label="Email *" type="email" placeholder="you@example.com"
+            <Field id="reg-email" label="Email *" type="email" placeholder="you@example.com"
               value={form.email} onChange={(v) => setForm({ ...form, email: v })}
               icon={<Mail className="w-4 h-4" />} />
-            <Field label="Name" placeholder="Your name (optional)"
+            <Field id="reg-name" label="Name" placeholder="Your name (optional)"
               value={form.name} onChange={(v) => setForm({ ...form, name: v })}
               icon={<Users className="w-4 h-4" />} />
-            <Field label="WhatsApp" placeholder="+91 98765 43210 (optional)"
+            <Field id="reg-whatsapp" label="WhatsApp" placeholder="+91 98765 43210 (optional)"
               value={form.whatsapp} onChange={(v) => setForm({ ...form, whatsapp: v })}
               icon={<Phone className="w-4 h-4" />} />
-            <Field label="Telegram" placeholder="Chat ID or @username (optional)"
+            <Field id="reg-telegram" label="Telegram" placeholder="Chat ID or @username (optional)"
               value={form.telegram} onChange={(v) => setForm({ ...form, telegram: v })}
               icon={<Send className="w-4 h-4" />} />
 
-            {err && <p className="text-red-400 text-xs">{err}</p>}
+            {err && <p role="alert" className="text-red-400 text-xs">{err}</p>}
 
             <button
               onClick={submit}

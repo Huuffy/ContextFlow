@@ -5,8 +5,9 @@ from sqlalchemy import select, desc
 from app.db.session import get_db
 from app.models import (
     Conversation, Message, Customer, AISummary, ConversationStatus,
-    ChannelIdentifier, MessageDirection,
+    ChannelIdentifier, MessageDirection, Agent,
 )
+from app.core.security import get_current_agent
 from app.services.message_service import persist_system_message
 from app.events.queues import outbound_queue, OutboundEvent
 from pydantic import BaseModel
@@ -91,7 +92,7 @@ async def list_conversations(
 
 
 @router.get("/{conv_id}", response_model=ConversationOut)
-async def get_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
+async def get_conversation(conv_id: str, db: AsyncSession = Depends(get_db),):
     result = await db.execute(select(Conversation).where(Conversation.id == conv_id))
     conv = result.scalar_one_or_none()
     if not conv:
@@ -120,7 +121,7 @@ async def get_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{conv_id}/messages", response_model=list[MessageOut])
-async def get_messages(conv_id: str, db: AsyncSession = Depends(get_db)):
+async def get_messages(conv_id: str, db: AsyncSession = Depends(get_db),):
     result = await db.execute(
         select(Message).where(Message.conversation_id == conv_id).order_by(Message.created_at)
     )
@@ -133,7 +134,7 @@ async def get_messages(conv_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{conv_id}/assign")
-async def assign_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
+async def assign_conversation(conv_id: str, db: AsyncSession = Depends(get_db),):
     result = await db.execute(select(Conversation).where(Conversation.id == conv_id))
     conv = result.scalar_one_or_none()
     if not conv:
@@ -144,7 +145,7 @@ async def assign_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{conv_id}/close")
-async def close_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
+async def close_conversation(conv_id: str, db: AsyncSession = Depends(get_db),):
     result = await db.execute(select(Conversation).where(Conversation.id == conv_id))
     conv = result.scalar_one_or_none()
     if not conv:
@@ -227,3 +228,14 @@ async def close_conversation(conv_id: str, db: AsyncSession = Depends(get_db)):
     conv.status = ConversationStatus.closed
     await db.commit()
     return {"status": "closed"}
+
+
+@router.delete("/{conv_id}")
+async def delete_conversation(conv_id: str, db: AsyncSession = Depends(get_db),):
+    result = await db.execute(select(Conversation).where(Conversation.id == conv_id))
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    await db.delete(conv)
+    await db.commit()
+    return {"status": "deleted"}

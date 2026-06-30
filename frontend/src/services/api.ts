@@ -14,6 +14,10 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (r) => r,
   (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+    }
     return Promise.reject(err)
   }
 )
@@ -33,6 +37,7 @@ export const conversations = {
   assign: (id: string, agent_id: string) =>
     client.post(`/conversations/${id}/assign`, { agent_id }).then((r) => r.data),
   close: (id: string) => client.post(`/conversations/${id}/close`).then((r) => r.data),
+  delete: (id: string) => client.delete(`/conversations/${id}`).then((r) => r.data),
 }
 
 export const messages = {

@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_db
-from app.models import Conversation, ConversationStatus, Customer, ChannelIdentifier, MessageStatus, Message, MessageDirection
+from app.models import Conversation, ConversationStatus, Customer, ChannelIdentifier, MessageStatus, Message, MessageDirection, Agent
+from app.core.security import get_current_agent
 from app.services.message_service import persist_outbound_message
 from app.events.queues import outbound_queue, OutboundEvent
 from pydantic import BaseModel

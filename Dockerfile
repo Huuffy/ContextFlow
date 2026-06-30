@@ -13,20 +13,12 @@ RUN pnpm build
 # Output: /app/frontend/dist
 
 
-# ─── Stage 2: Python backend ───────────────────────────────────────────────────
-FROM python:3.12-slim
+# ─── Stage 2: Python backend (uses pre-built base with all heavy deps) ─────────
+FROM gcr.io/contextflow-497616/contextflow-base:latest
 WORKDIR /app/backend
 
-# uv — fast Python package installer
-RUN pip install --no-cache-dir uv
-
-# Install Python dependencies
+# Copy backend source code
 COPY backend/ .
-RUN uv pip install --system --no-cache .
-
-# Pre-download HuggingFace embedding model at build time
-# Eliminates the cold-start download on first request
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 
 # whitelist.json — campaign contacts registered via landing page
 # campaigns.py resolves WHITELIST_PATH as 5 parent dirs up from v1/campaigns.py = /app/whitelist.json

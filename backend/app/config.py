@@ -12,9 +12,9 @@ class Settings(BaseSettings):
     azure_openai_api_version: str = "2024-08-01-preview"
 
     # Auth
-    jwt_secret_key: str = "change-me-in-production"
+    jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60
+    jwt_expire_minutes: int = 30
 
     # Gmail
     gmail_address: str = ""
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     # Meta — WhatsApp
     whatsapp_phone_number_id: str = ""
     meta_access_token: str = ""
-    whatsapp_verify_token: str = "contextflow-verify-secret"
+    whatsapp_verify_token: str = ""
     meta_app_secret: str = ""
 
     # Meta — Instagram

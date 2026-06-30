@@ -54,4 +54,26 @@ _run_*.bat
 *.tmp
 
 vite.build.cache.yaml
+deploy-env.yaml
 .firebase/
+
+# Claude
+CLAUDE.md
+
+# Firebase
+.firebase/
+
+# Build
+frontend/dist/
+frontend/.vite/
+
+# Docker build files (if not meant for the repo)
+Dockerfile.base
+cloudbuild.yaml
+cloudbuild.base.yaml
+
+# Local deployment
+deploy-env.yaml
+vite.build.cache.yaml
+
+

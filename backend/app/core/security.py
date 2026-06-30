@@ -25,6 +25,22 @@ def create_access_token(agent_id: str, role: str) -> str:
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
+async def get_ws_agent(token: str | None, db: AsyncSession):
+    """Validate a bearer token for WebSocket connections (no Depends available there)."""
+    if not token:
+        return None
+    from app.models import Agent
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        agent_id: str = payload.get("sub")
+        if not agent_id:
+            return None
+    except JWTError:
+        return None
+    result = await db.execute(select(Agent).where(Agent.id == agent_id, Agent.is_active == True))
+    return result.scalar_one_or_none()
+
+
 async def get_current_agent(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),

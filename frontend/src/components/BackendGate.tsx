@@ -61,6 +61,7 @@ export default function BackendGate({ children }: { children: React.ReactNode })
           >
             {/* Animated orb */}
             <motion.div
+              aria-hidden="true"
               className="absolute w-96 h-96 rounded-full blur-3xl pointer-events-none"
               style={{ background: 'rgba(13,148,136,0.2)' }}
               animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.9, 0.5] }}
@@ -84,9 +85,10 @@ export default function BackendGate({ children }: { children: React.ReactNode })
               </div>
 
               {/* Spinner + status */}
-              <div className="flex flex-col items-center gap-3 mt-2">
+              <div className="flex flex-col items-center gap-3 mt-2" role="status" aria-live="polite" aria-label="Connecting to backend">
                 <div className="flex items-center gap-2.5 text-teal-300/80 text-sm">
                   <motion.div
+                    aria-hidden="true"
                     className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full"
                     animate={{ rotate: 360 }}
                     transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
@@ -106,7 +108,7 @@ export default function BackendGate({ children }: { children: React.ReactNode })
                 </div>
 
                 {/* Dot pulse row */}
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5" aria-hidden="true">
                   {[0, 1, 2, 3, 4].map((i) => (
                     <motion.div
                       key={i}

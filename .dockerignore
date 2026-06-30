@@ -4,6 +4,8 @@
 # Local secrets — must never be in the image
 backend/.env
 backend/.env.local
+deploy-env.yaml
+vite.build.cache.yaml
 
 # Python build artifacts
 backend/.venv
@@ -32,6 +34,8 @@ run.py
 Resources/
 *.md
 *.docx
+Dockerfile.base
+cloudbuild.base.yaml
 
 # IDE
 .vscode

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Mail, Send, Phone, Monitor, MessageSquare, XCircle } from 'lucide-react'
+import { Mail, Send, Phone, Monitor, MessageSquare, XCircle, Trash2 } from 'lucide-react'
 import { useConversationStore } from '../../stores/conversationStore'
 import { conversations as convApi, messages as msgApi } from '../../services/api'
 import type { Conversation, Message } from '../../types'
@@ -71,6 +71,17 @@ export default function ConversationThread({ conversation, onClose }: Props) {
     }
   }
 
+  const handleDelete = async () => {
+    if (!conversation) return
+    if (!window.confirm('Delete this conversation permanently?')) return
+    try {
+      await convApi.delete(conversation.id)
+      onClose?.(conversation.id)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const send = async () => {
     if (!replyText.trim() || !conversation) return
     setSending(true)
@@ -124,6 +135,13 @@ export default function ConversationThread({ conversation, onClose }: Props) {
               Close ticket
             </button>
           )}
+          <button
+            onClick={handleDelete}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-600 border border-gray-200 hover:border-red-200 transition-colors"
+            aria-label="Delete conversation"
+          >
+            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
         </div>
       </div>
 
@@ -132,7 +150,7 @@ export default function ConversationThread({ conversation, onClose }: Props) {
         {msgs.map((msg) => (
           <MessageBubble key={msg.id} msg={msg} />
         ))}
-        <div ref={bottomRef} />
+        <div ref={bottomRef} aria-hidden="true" />
       </div>
 
       {/* Reply composer */}
@@ -161,7 +179,11 @@ export default function ConversationThread({ conversation, onClose }: Props) {
 
         {/* Message textarea + send */}
         <div className="flex gap-2">
+          <label htmlFor="reply-input" className="sr-only">
+            Reply message via {channelLabels[selectedChannel] ?? selectedChannel}
+          </label>
           <textarea
+            id="reply-input"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             onKeyDown={(e) => {

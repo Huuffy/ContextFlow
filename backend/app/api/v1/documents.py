@@ -2,13 +2,18 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_db
-from app.models import UploadedDocument, FileType
+from app.models import UploadedDocument, FileType, Agent
+from app.core.security import get_current_agent
 from app.config import settings
 from pydantic import BaseModel
 from pathlib import Path
+import re
 import asyncio
 from datetime import datetime
 from typing import Optional
+
+_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+_SAFE_FILENAME = re.compile(r"[^a-zA-Z0-9._-]")
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -30,23 +35,34 @@ async def upload_document(
     db: AsyncSession = Depends(get_db),
 ):
     # Determine file type
-    name = file.filename or "upload"
-    ext = Path(name).suffix.lower().lstrip(".")
+    raw_name = file.filename or "upload"
+    ext = Path(raw_name).suffix.lower().lstrip(".")
     if ext not in ("pdf", "csv"):
         raise HTTPException(status_code=400, detail="Only PDF and CSV files are supported")
 
-    # Save file
-    customer_dir = Path(settings.upload_dir) / customer_id
+    # Sanitize filename — strip path separators and special chars
+    safe_stem = _SAFE_FILENAME.sub("_", Path(raw_name).stem)[:100]
+    name = f"{safe_stem}.{ext}"
+
+    # Enforce file size limit before writing to disk
+    content = await file.read(_MAX_UPLOAD_BYTES + 1)
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large (max 10 MB)")
+
+    # Save file — verify resolved path stays within upload_dir
+    upload_root = Path(settings.upload_dir).resolve()
+    customer_dir = upload_root / customer_id
     customer_dir.mkdir(parents=True, exist_ok=True)
-    file_path = customer_dir / name
-    content = await file.read()
+    file_path = (customer_dir / name).resolve()
+    if not str(file_path).startswith(str(upload_root)):
+        raise HTTPException(status_code=400, detail="Invalid file path")
     file_path.write_bytes(content)
 
     doc = UploadedDocument(
         customer_id=customer_id,
         filename=name,
         file_type=FileType(ext),
-        uploaded_by=agent.id,
+        uploaded_by=None,
         file_path=str(file_path),
         processed=False,
     )

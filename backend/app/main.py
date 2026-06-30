@@ -90,7 +90,14 @@ async def lifespan(app: FastAPI):
     logger.info("Workers stopped")
 
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+_limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="ContextFlow API", version="0.1.0", lifespan=lifespan, redirect_slashes=False)
+app.state.limiter = _limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 _raw_origins = os.getenv(
     "ALLOWED_ORIGINS",
@@ -102,9 +109,27 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
+
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import Response as StarletteResponse
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response: StarletteResponse = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # API routers
 from app.api.v1.auth import router as auth_router
@@ -145,7 +170,6 @@ async def websocket_endpoint(websocket: WebSocket, agent_id: str):
     await ws_manager.connect(agent_id, websocket)
     try:
         while True:
-            # Keep connection alive; client can send pings
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text("pong")

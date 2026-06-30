@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_db
-from app.models import DNCEntry, ConsentRecord, IdentifierType, Customer
+from app.models import DNCEntry, ConsentRecord, IdentifierType, Customer, Agent
+from app.core.security import get_current_agent
 from pydantic import BaseModel
 from datetime import datetime
 

@@ -2,7 +2,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from app.db.session import get_db
-from app.models import Customer, ChannelIdentifier, Transaction, UploadedDocument
+from app.models import Customer, ChannelIdentifier, Transaction, UploadedDocument, Agent
+from app.core.security import get_current_agent
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, date
@@ -29,7 +30,7 @@ class TransactionOut(BaseModel):
 
 @router.get("", response_model=list[CustomerOut])
 async def search_customers(
-    search: Optional[str] = Query(None),
+    search: Optional[str] = Query(None, max_length=100),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Customer)
